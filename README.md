@@ -1,7 +1,6 @@
 # 🤖 AI Character Chat (Client-Side)
 
-![Chat Screenshot Placeholder](https://via.placeholder.com/800x400?text=AI+Character+Chat+Screenshot)
-*(Consider adding an actual screenshot of your chat interface here!)*
+
 
 A fully client-side (HTML, CSS, JavaScript) web application that allows users to create and chat with AI characters using the KoboldCpp API. This project provides a user-friendly interface to define a custom AI persona, set names for both the user and the AI, and engage in dynamic conversations, all running directly in your browser.
 
