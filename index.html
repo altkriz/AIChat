@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Character Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .floating {
+            animation: float 6s ease-in-out infinite;
+        }
+        .message-enter {
+            animation: messageEnter 0.3s ease-out;
+        }
+        @keyframes messageEnter {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .typing-indicator-dot:after {
+            content: ''; /* Initialize as empty */
+            animation: typing 1.5s infinite;
+        }
+        @keyframes typing {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 to-purple-50 font-inter min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300 transform hover:shadow-2xl">
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="p-8">
+            <div class="text-center mb-8">
+                <div class="floating inline-block mb-4">
+                    <div class="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
+                        <i data-feather="message-circle" class="text-white w-8 h-8"></i>
+                    </div>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Character Chat</h1>
+                <p class="text-gray-600">Customize your AI companion and start chatting</p>
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <label for="user-name-input" class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                    <input type="text" id="user-name-input" placeholder="e.g. Alex" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200" required>
+                </div>
+                
+                <div>
+                    <label for="character-name-input" class="block text-sm font-medium text-gray-700 mb-1">Character Name</label>
+                    <input type="text" id="character-name-input" placeholder="e.g. Luna" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200" required>
+                </div>
+                
+                <div>
+                    <label for="character-persona-input" class="block text-sm font-medium text-gray-700 mb-1">Character Personality</label>
+                    <textarea id="character-persona-input" rows="5" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200" required>You are a helpful and friendly AI assistant. You are designed to provide clear, concise, and accurate information. You are polite, professional, and always ready to assist with a positive attitude. You answer questions directly and offer relevant suggestions when appropriate. You avoid overly casual language and maintain a supportive tone.</textarea>
+                </div>
+                
+                <button id="start-chat-button" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition duration-200 flex items-center justify-center space-x-2">
+                    <span>Start Chatting</span>
+                    <i data-feather="arrow-right" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Screen -->
+        <div id="chat-screen" class="hidden h-full flex flex-col">
+            <div id="chat-header" class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <i data-feather="message-square" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="text-xl font-semibold" id="character-name-display"></h2>
+                </div>
+                <button id="back-to-settings" class="text-white bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition duration-200">
+                    <i data-feather="settings" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div id="chatbox" class="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4">
+                <!-- Messages will be inserted here -->
+            </div>
+
+            <div class="p-4 border-t border-gray-200 bg-white">
+                <div id="input_area" class="flex space-x-2">
+                    <input type="text" id="user_input" placeholder="Type your message..." class="flex-1 px-4 py-3 rounded-full border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+                    <button id="send_button" class="bg-indigo-500 text-white p-3 rounded-full hover:bg-indigo-600 transition duration-200 flex items-center justify-center">
+                        <i data-feather="send" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div id="typing-indicator" class="hidden text-sm text-gray-500 mt-2 pl-4">
+                    <span class="font-medium" id="typing-name"></span> is typing<span class="typing-indicator-dot"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize AOS and Feather Icons
+        AOS.init();
+        feather.replace();
+
+        // --- Global Variables ---
+        let currentPersona = "";
+        let currentUserName = "";
+        let currentCharacterName = "";
+        let conversationHistory = []; // Stores the chat history for context
+        const KOBOLDCPP_API_URL = "https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate"; // Directly use the API URL
+
+        // --- DOM Elements ---
+        const settingsScreen = document.getElementById('settings-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const startChatButton = document.getElementById('start-chat-button');
+        const backToSettingsButton = document.getElementById('back-to-settings');
+        const userNameInput = document.getElementById('user-name-input');
+        const characterNameInput = document.getElementById('character-name-input');
+        const characterPersonaInput = document.getElementById('character-persona-input');
+        const characterNameDisplay = document.getElementById('character-name-display');
+        const chatbox = document.getElementById('chatbox');
+        const userInputField = document.getElementById('user_input');
+        const sendButton = document.getElementById('send_button');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const typingName = document.getElementById('typing-name');
+
+        // --- Default Persona ---
+        const DEFAULT_ASSISTANT_PERSONA = "You are a helpful and friendly AI assistant. You are designed to provide clear, concise, and accurate information. You are polite, professional, and always ready to assist with a positive attitude. You answer questions directly and offer relevant suggestions when appropriate. You avoid overly casual language and maintain a supportive tone.";
+
+        // --- Functions for Core Chat Logic (formerly PHP) ---
+
+        /**
+         * Builds the full prompt string for the AI API.
+         * @param {string} persona The character's persona description.
+         * @param {string} userName The name of the user.
+         * @param {string} characterName The name of the AI character.
+         * @param {Array<Object>} conversationHistory An array of message objects ({role: 'user'/'bot', content: 'message'}).
+         * @returns {string} The complete prompt string.
+         */
+        function buildFullPrompt(persona, userName, characterName, conversationHistory) {
+            let prompt = persona + "\n\n";
+            conversationHistory.forEach(message => {
+                if (message.role === 'user') {
+                    prompt += userName + ": " + message.content + "\n";
+                } else if (message.role === 'bot') {
+                    prompt += characterName + ": " + message.content + "\n";
+                }
+            });
+            prompt += characterName + ":"; // Prime the model to respond as the character
+            return prompt;
+        }
+
+        /**
+         * Makes the API call to KoboldCpp and returns the AI's response.
+         * @param {string} fullPrompt The complete prompt string.
+         * @param {string} userName The name of the user.
+         * @param {string} characterName The name of the AI character.
+         * @returns {Promise<string>} A promise that resolves with the AI's response or an error message.
+         */
+        async function getKoboldCppResponse(fullPrompt, userName, characterName) {
+            // Dynamically create the stop sequence to prevent the AI from generating user's turns
+            const stop_sequence = [
+                `${userName}:`,
+                `\n${userName}:`,
+                `${characterName}:`, // Sometimes helpful if the model repeats its own name
+                `\n${characterName}:`,
+                "User:", // Generic fallbacks
+                "\nUser:",
+                "Bot:",
+                "\nBot:"
+            ];
+            const uniqueStopSequence = [...new Set(stop_sequence)]; // Remove duplicates
+
+            const data = {
+                prompt: fullPrompt,
+                max_length: 150,    // Max tokens to generate
+                temperature: 0.8,   // Creativity of the response
+                top_p: 0.9,         // Diversity of the response
+                rep_pen: 1.05,      // Repetition penalty
+                stop_sequence: uniqueStopSequence, // Dynamic stop sequence
+                do_sample: true     // Enable sampling for varied responses
+            };
+
+            try {
+                const response = await fetch(KOBOLDCPP_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMessage = errorData.detail && errorData.detail.msg ? errorData.detail.msg : `HTTP error! Status: ${response.status}`;
+                    throw new Error(`API Error: ${errorMessage}`);
+                }
+
+                const jsonResponse = await response.json();
+
+                if (jsonResponse.results && jsonResponse.results[0] && jsonResponse.results[0].text) {
+                    let text = jsonResponse.results[0].text.trim();
+
+                    // Attempt to cut off incomplete sentences at the end
+                    const lastPeriod = text.lastIndexOf('.');
+                    const lastQuestion = text.lastIndexOf('?');
+                    const lastExclamation = text.lastIndexOf('!');
+                    const lastStop = Math.max(lastPeriod, lastQuestion, lastExclamation);
+
+                    if (lastStop !== -1 && lastStop < (text.length - 1)) {
+                        text = text.substring(0, lastStop + 1);
+                    }
+
+                    // More robust removal of any premature "user" turns that the AI might generate
+                    for (const seq of uniqueStopSequence) {
+                        const pos = text.indexOf(seq);
+                        if (pos !== -1) {
+                            text = text.substring(0, pos);
+                            break; // Stop after the first found sequence
+                        }
+                    }
+
+                    return text.trim();
+
+                } else {
+                    throw new Error("Unexpected API response structure or no text generated.");
+                }
+            } catch (error) {
+                console.error("API Call Error:", error);
+                return `Error: ${error.message || "An unknown error occurred during API call."}`;
+            }
+        }
+
+        // --- Event Listeners and Initial Setup ---
+
+        // Load saved settings from localStorage when the page loads
+        window.onload = function() {
+            const savedUserName = localStorage.getItem('userName');
+            const savedCharacterName = localStorage.getItem('characterName');
+            const savedPersona = localStorage.getItem('characterPersona');
+
+            characterPersonaInput.value = savedPersona || DEFAULT_ASSISTANT_PERSONA; // Set default or saved persona
+            if (savedUserName) userNameInput.value = savedUserName;
+            if (savedCharacterName) characterNameInput.value = savedCharacterName;
+        };
+
+        // Handle "Start Chat" button click
+        startChatButton.addEventListener('click', function() {
+            currentUserName = userNameInput.value.trim();
+            currentCharacterName = characterNameInput.value.trim();
+            currentPersona = characterPersonaInput.value.trim();
+
+            if (!currentUserName || !currentCharacterName || !currentPersona) {
+                alert("Please fill in all fields (Your Name, Character's Name, and Persona) to start the chat!");
+                return;
+            }
+
+            // Save current settings to localStorage
+            localStorage.setItem('userName', currentUserName);
+            localStorage.setItem('characterName', currentCharacterName);
+            localStorage.setItem('characterPersona', currentPersona);
+
+            // Initialize conversation history with the character's first greeting
+            const initialGreeting = `Hello ${currentUserName}! I am ${currentCharacterName}. How may I assist you today?`;
+            conversationHistory = [
+                { role: 'bot', content: initialGreeting }
+            ];
+
+            // UI transitions
+            settingsScreen.style.display = 'none';
+            chatScreen.classList.remove('hidden'); // Use Tailwind's hidden class to show chat screen
+            characterNameDisplay.textContent = currentCharacterName; // Update chat header with character name
+            typingName.textContent = currentCharacterName; // Update typing indicator name
+            
+            // Append the initial greeting message to the chatbox
+            appendMessage('bot', conversationHistory[0].content, true); // `true` for initial styling
+            userInputField.focus(); // Automatically focus the input field
+        });
+
+        // Handle "Back to Settings" button click
+        backToSettingsButton.addEventListener('click', function() {
+            chatScreen.classList.add('hidden'); // Hide chat screen
+            settingsScreen.style.display = 'block'; // Show settings screen
+            chatbox.innerHTML = ''; // Clear chatbox content
+            conversationHistory = []; // Clear conversation history
+        });
+
+        // Handle sending messages (button click or Enter key)
+        sendButton.addEventListener('click', sendMessage);
+        userInputField.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // --- Chat UI Helper Functions ---
+
+        /**
+         * Appends a new message bubble to the chatbox.
+         * @param {string} sender 'user' or 'bot'.
+         * @param {string} text The message content.
+         * @param {boolean} isInitial Optional: true if it's the very first greeting (for special styling).
+         */
+        function appendMessage(sender, text, isInitial = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message-enter'); // Apply CSS animation class
+            
+            if (sender === 'user') {
+                messageDiv.innerHTML = `
+                    <div class="flex justify-end">
+                        <div class="max-w-xs md:max-w-md lg:max-w-lg bg-indigo-500 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-sm">
+                            ${text}
+                        </div>
+                    </div>
+                `;
+            } else { // sender === 'bot'
+                messageDiv.innerHTML = `
+                    <div class="flex justify-start">
+                        <div class="max-w-xs md:max-w-md lg:max-w-lg bg-white border border-gray-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
+                            ${isInitial ? text : `${currentCharacterName}: ${text}`}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight; // Scroll to the bottom of the chat
+        }
+
+        /**
+         * Handles sending a user's message, calling the API, and displaying the response.
+         */
+        async function sendMessage() {
+            const userMessage = userInputField.value.trim();
+            if (userMessage === '') return; // Don't send empty messages
+
+            appendMessage('user', userMessage); // Display user's message immediately
+
+            userInputField.value = ''; // Clear input field
+            userInputField.disabled = true; // Disable input while waiting for response
+            sendButton.disabled = true; // Disable send button
+            typingIndicator.classList.remove('hidden'); // Show typing indicator
+
+            // Add user's message to history for building the prompt
+            conversationHistory.push({ role: 'user', content: userMessage });
+
+            try {
+                // Build the full prompt and get AI response directly from JS
+                const fullPrompt = buildFullPrompt(currentPersona, currentUserName, currentCharacterName, conversationHistory);
+                const botResponse = await getKoboldCppResponse(fullPrompt, currentUserName, currentCharacterName);
+
+                // Add bot's response to the history
+                conversationHistory.push({ role: 'bot', content: botResponse });
+                appendMessage('bot', botResponse); // Display bot's message
+
+            } catch (e) {
+                console.error("Error during message processing:", e);
+                conversationHistory.push({ role: 'bot', content: `Error: ${currentCharacterName} is having trouble responding. (${e.message || 'Unknown error'})` });
+                appendMessage('bot', `Error: ${currentCharacterName} is having trouble responding. (${e.message || 'Unknown error'})`);
+            } finally {
+                // Re-enable UI elements regardless of success or failure
+                typingIndicator.classList.add('hidden'); // Hide typing indicator
+                userInputField.disabled = false; // Re-enable input
+                sendButton.disabled = false; // Re-enable send button
+                userInputField.focus(); // Focus input for next message
+            }
+        }
+    </script>
+</body>
+</html>
