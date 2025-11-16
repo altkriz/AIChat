@@ -1,385 +1,1007 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Character Chat</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-        .floating {
-            animation: float 6s ease-in-out infinite;
-        }
-        .message-enter {
-            animation: messageEnter 0.3s ease-out;
-        }
-        @keyframes messageEnter {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .typing-indicator-dot:after {
-            content: ''; /* Initialize as empty */
-            animation: typing 1.5s infinite;
-        }
-        @keyframes typing {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KrizVibe — RP Character Chat (Glass + Long-Term Memory)</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- AOS -->
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet" />
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+
+  <!-- Feather Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --glass-bg: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,255,255,0.08);
+      --accent-1: #7c3aed;
+      --accent-2: #06b6d4;
+      --neon: linear-gradient(90deg,#7c3aed 0%, #4f46e5 40%, #06b6d4 100%);
+    }
+
+    body {
+      background: radial-gradient(circle at 10% 10%, rgba(124,58,237,0.06), transparent),
+                  radial-gradient(circle at 90% 90%, rgba(6,182,212,0.05), transparent),
+                  linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+      color: #e6eef8;
+      font-family: Inter, system-ui;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px) saturate(140%);
+      border-radius: 18px;
+      box-shadow: 0 15px 50px rgba(6,8,18,0.6);
+    }
+
+    .accent-line {
+      height: 4px;
+      background: var(--neon);
+      border-radius: 8px;
+      box-shadow: 0 4px 30px rgba(99,102,241,0.18);
+    }
+
+    .msg-user {
+      background: linear-gradient(90deg, rgba(99,102,241,0.95), rgba(124,58,237,0.95));
+      color: white;
+      border-radius: 16px 16px 6px 16px;
+    }
+
+    .msg-bot {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.05);
+      color: #dbeafe;
+      border-radius: 16px 16px 16px 6px;
+    }
+
+    .meta {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      display: inline-block;
+      animation: bounce 1.3s infinite ease-in-out;
+    }
+    .typing-dots span:nth-child(2){ animation-delay: .2s; }
+    .typing-dots span:nth-child(3){ animation-delay: .4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: .3; }
+      40% { transform: translateY(-8px); opacity: 1; }
+    }
+
+    .panel-hidden {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height .4s ease, opacity .4s ease;
+    }
+    .panel-show {
+      max-height: 600px;
+      opacity: 1;
+      transition: max-height .6s ease, opacity .6s ease;
+    }
+  </style>
 </head>
-<body class="bg-gradient-to-br from-indigo-50 to-purple-50 font-inter min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300 transform hover:shadow-2xl">
-        <!-- Settings Screen -->
-        <div id="settings-screen" class="p-8">
-            <div class="text-center mb-8">
-                <div class="floating inline-block mb-4">
-                    <div class="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
-                        <i data-feather="message-circle" class="text-white w-8 h-8"></i>
-                    </div>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-800 mb-2">Character Chat</h1>
-                <p class="text-gray-600">Customize your AI companion and start chatting</p>
+
+<body>
+  <div class="min-h-screen p-6 flex justify-center items-center">
+    <div class="w-full max-w-6xl card overflow-hidden">
+
+      <div class="accent-line"></div>
+
+      <div class="md:flex">
+        
+        <!-- SETTINGS SCREEN -->
+        <aside class="md:w-1/3 p-6 border-r border-white/10">
+
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex justify-center items-center text-white shadow-lg font-bold">AI</div>
+            <div>
+              <h3 class="text-lg font-bold">KrizVibe RP Engine</h3>
+              <p class="meta">Glass UI • Long-Term Memory • Story Persistence</p>
+            </div>
+          </div>
+
+          <!-- Inputs -->
+          <div class="space-y-4">
+
+            <div>
+              <label class="text-sm">Your Name</label>
+              <input id="user-name-input" class="w-full mt-1 p-2 rounded bg-transparent border border-white/10">
             </div>
 
-            <div class="space-y-6">
-                <div>
-                    <label for="user-name-input" class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-                    <input type="text" id="user-name-input" placeholder="e.g. Alex" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200" required>
-                </div>
-                
-                <div>
-                    <label for="character-name-input" class="block text-sm font-medium text-gray-700 mb-1">Character Name</label>
-                    <input type="text" id="character-name-input" placeholder="e.g. Luna" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200" required>
-                </div>
-                
-                <div>
-                    <label for="character-persona-input" class="block text-sm font-medium text-gray-700 mb-1">Character Personality</label>
-                    <textarea id="character-persona-input" rows="5" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200" required>You are a helpful and friendly AI assistant. You are designed to provide clear, concise, and accurate information. You are polite, professional, and always ready to assist with a positive attitude. You answer questions directly and offer relevant suggestions when appropriate. You avoid overly casual language and maintain a supportive tone.</textarea>
-                </div>
-                
-                <button id="start-chat-button" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition duration-200 flex items-center justify-center space-x-2">
-                    <span>Start Chatting</span>
-                    <i data-feather="arrow-right" class="w-5 h-5"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Chat Screen -->
-        <div id="chat-screen" class="hidden h-full flex flex-col">
-            <div id="chat-header" class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                        <i data-feather="message-square" class="w-5 h-5"></i>
-                    </div>
-                    <h2 class="text-xl font-semibold" id="character-name-display"></h2>
-                </div>
-                <button id="back-to-settings" class="text-white bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition duration-200">
-                    <i data-feather="settings" class="w-5 h-5"></i>
-                </button>
+            <div>
+              <label class="text-sm">Character Name</label>
+              <input id="character-name-input" class="w-full mt-1 p-2 rounded bg-transparent border border-white/10">
             </div>
 
-            <div id="chatbox" class="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4">
-                <!-- Messages will be inserted here -->
+            <div>
+              <label class="text-sm">Character Sheet</label>
+              <textarea id="character-sheet-input" rows="4" class="w-full mt-1 p-2 rounded bg-transparent border border-white/10">Luna is a cosmic librarian with soft humor, gentle mystery, and poetic tone.</textarea>
             </div>
 
-            <div class="p-4 border-t border-gray-200 bg-white">
-                <div id="input_area" class="flex space-x-2">
-                    <input type="text" id="user_input" placeholder="Type your message..." class="flex-1 px-4 py-3 rounded-full border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
-                    <button id="send_button" class="bg-indigo-500 text-white p-3 rounded-full hover:bg-indigo-600 transition duration-200 flex items-center justify-center">
-                        <i data-feather="send" class="w-5 h-5"></i>
-                    </button>
-                </div>
-                <div id="typing-indicator" class="hidden text-sm text-gray-500 mt-2 pl-4">
-                    <span class="font-medium" id="typing-name"></span> is typing<span class="typing-indicator-dot"></span>
-                </div>
+            <div>
+              <label class="text-sm">Player Notes (flavor only)</label>
+              <textarea id="player-notes-input" rows="3" class="w-full mt-1 p-2 rounded bg-transparent border border-white/10">Avoid political tension. Keep replies PG-13. Slightly tease the user.</textarea>
             </div>
-        </div>
+
+            <div>
+              <label class="text-sm">World Rules</label>
+              <textarea id="world-rules-input" rows="3" class="w-full mt-1 p-2 rounded bg-transparent border border-white/10">Always stay in character. No OOC. No breaking 4th wall. No explicit content.</textarea>
+            </div>
+
+            <!-- START -->
+            <button id="start-chat-button" class="w-full mt-4 p-2 rounded bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold">
+              Start / Continue Chat
+            </button>
+
+            <button id="clear-history" class="w-full p-2 rounded bg-white/10 text-white meta mt-2">Clear History</button>
+
+            <div class="flex gap-2 mt-3 text-sm">
+              <input id="persist-switch" type="checkbox" checked>
+              <label>Persist Chat</label>
+            </div>
+
+            <button id="export-btn" class="w-full p-2 mt-3 rounded bg-white/10 text-white meta">Export Transcript</button>
+
+            <!-- MEMORY PANEL TOGGLE -->
+            <button id="toggle-memory" class="w-full mt-4 p-2 rounded bg-white/10 hover:bg-white/20 transition">
+              <i data-feather="database" class="inline-block w-4"></i> Long-Term Memory
+            </button>
+
+            <!-- MEMORY PANEL -->
+            <div id="memory-panel" class="panel-hidden mt-3 p-3 rounded bg-white/5 border border-white/10 space-y-2">
+
+              <div>
+                <h4 class="font-semibold text-indigo-300">Facts</h4>
+                <div id="mem-facts" class="meta"></div>
+              </div>
+
+              <div>
+                <h4 class="font-semibold text-indigo-300">Relationships</h4>
+                <div id="mem-relationships" class="meta"></div>
+              </div>
+
+              <div>
+                <h4 class="font-semibold text-indigo-300">World Lore</h4>
+                <div id="mem-world" class="meta"></div>
+              </div>
+
+              <div>
+                <h4 class="font-semibold text-indigo-300">Events</h4>
+                <div id="mem-events" class="meta"></div>
+              </div>
+
+              <div>
+                <h4 class="font-semibold text-indigo-300">Emotion State</h4>
+                <div id="mem-emotion" class="meta"></div>
+              </div>
+
+              <button id="memory-clear" class="w-full p-2 rounded bg-red-500/30 text-red-200 mt-2">Clear Memory</button>
+            </div>
+
+          </div>
+        </aside>
+
+        <!-- CHAT AREA -->
+        <main class="md:w-2/3 p-6 flex flex-col">
+
+          <div class="flex items-center gap-3 mb-4">
+            <div id="char-avatar" class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex justify-center items-center font-bold text-lg">C</div>
+            <div>
+              <div id="character-name-display" class="text-xl font-semibold">Character</div>
+              <div id="character-bio-mini" class="meta">Bio preview...</div>
+            </div>
+          </div>
+
+          <!-- CHAT MESSAGES -->
+          <div id="chatbox" class="flex-1 overflow-y-auto p-4 rounded bg-white/5 border border-white/10 space-y-3">
+          </div>
+
+          <!-- Typing -->
+          <div id="typing-indicator" class="mt-3 hidden flex gap-2 items-center meta">
+            <div class="typing-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <div id="typing-text">Typing…</div>
+          </div>
+
+          <!-- INPUT -->
+          <div class="mt-4 flex gap-3">
+            <input id="user_input" class="flex-1 p-3 rounded-full bg-transparent border border-white/10" placeholder="Type...">
+            <button id="send_button" class="p-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+              <i data-feather="send"></i>
+            </button>
+          </div>
+
+        </main>
+      </div>
     </div>
+  </div>
 
-    <script>
-        // Initialize AOS and Feather Icons
-        AOS.init();
-        feather.replace();
+<script>
+AOS.init();
+feather.replace();
+/* ---------------------------
+   LONG-TERM MEMORY (LTM)
+   --------------------------- */
+const LTM_STORAGE_KEY = "kriz_rp_ltmemory_v1";
+let longTermMemory = {
+  facts: [],          // {id, text, sourceTs}
+  relationships: [],  // {id, text, score, sourceTs}
+  world: [],          // {id, text, sourceTs}
+  events: [],         // {id, text, ts}
+  emotion: {          // float values - -1..1 (but we use -5..5 scale internally)
+    trust: 0,
+    affinity: 0,
+    tension: 0,
+    curiosity: 0
+  },
+  metadata: {
+    createdAt: Date.now(),
+    lastUpdated: Date.now()
+  }
+};
 
-        // --- Global Variables ---
-        let currentPersona = "";
-        let currentUserName = "";
-        let currentCharacterName = "";
-        let conversationHistory = []; // Stores the chat history for context
-        const KOBOLDCPP_API_URL = "https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate"; // Directly use the API URL
+function saveLongTermMemory() {
+  try {
+    longTermMemory.metadata.lastUpdated = Date.now();
+    localStorage.setItem(LTM_STORAGE_KEY, JSON.stringify(longTermMemory));
+    updateMemoryPanel();
+  } catch (e) {
+    console.warn("Failed to save LTM:", e);
+  }
+}
 
-        // --- DOM Elements ---
-        const settingsScreen = document.getElementById('settings-screen');
-        const chatScreen = document.getElementById('chat-screen');
-        const startChatButton = document.getElementById('start-chat-button');
-        const backToSettingsButton = document.getElementById('back-to-settings');
-        const userNameInput = document.getElementById('user-name-input');
-        const characterNameInput = document.getElementById('character-name-input');
-        const characterPersonaInput = document.getElementById('character-persona-input');
-        const characterNameDisplay = document.getElementById('character-name-display');
-        const chatbox = document.getElementById('chatbox');
-        const userInputField = document.getElementById('user_input');
-        const sendButton = document.getElementById('send_button');
-        const typingIndicator = document.getElementById('typing-indicator');
-        const typingName = document.getElementById('typing-name');
+function loadLongTermMemory() {
+  const raw = localStorage.getItem(LTM_STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    // shallow validation
+    if (parsed && typeof parsed === "object") {
+      longTermMemory = Object.assign(longTermMemory, parsed);
+    }
+  } catch (e) {
+    console.warn("Failed to load LTM:", e);
+  }
+}
+loadLongTermMemory();
 
-        // --- Default Persona ---
-        const DEFAULT_ASSISTANT_PERSONA = "You are a helpful and friendly AI assistant. You are designed to provide clear, concise, and accurate information. You are polite, professional, and always ready to assist with a positive attitude. You answer questions directly and offer relevant suggestions when appropriate. You avoid overly casual language and maintain a supportive tone.";
+/* ---------------------------
+   MEMORY UTILS
+   --------------------------- */
+function mkId(prefix = "m") {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+}
 
-        // --- Functions for Core Chat Logic (formerly PHP) ---
+function pushFact(text) {
+  if (!text || !text.trim()) return;
+  const t = text.trim();
+  // avoid duplicates (simple)
+  if (longTermMemory.facts.some(f => f.text.toLowerCase() === t.toLowerCase())) return;
+  longTermMemory.facts.push({ id: mkId("fact"), text: t, sourceTs: Date.now() });
+  saveLongTermMemory();
+}
 
-        /**
-         * Builds the full prompt string for the AI API.
-         * @param {string} persona The character's persona description.
-         * @param {string} userName The name of the user.
-         * @param {string} characterName The name of the AI character.
-         * @param {Array<Object>} conversationHistory An array of message objects ({role: 'user'/'bot', content: 'message'}).
-         * @returns {string} The complete prompt string.
-         */
-        function buildFullPrompt(persona, userName, characterName, conversationHistory) {
-            let prompt = persona + "\n\n";
-            conversationHistory.forEach(message => {
-                if (message.role === 'user') {
-                    prompt += userName + ": " + message.content + "\n";
-                } else if (message.role === 'bot') {
-                    prompt += characterName + ": " + message.content + "\n";
-                }
-            });
-            prompt += characterName + ":"; // Prime the model to respond as the character
-            return prompt;
+function pushWorld(text) {
+  if (!text || !text.trim()) return;
+  const t = text.trim();
+  if (longTermMemory.world.some(w => w.text.toLowerCase() === t.toLowerCase())) return;
+  longTermMemory.world.push({ id: mkId("world"), text: t, sourceTs: Date.now() });
+  saveLongTermMemory();
+}
+
+function pushEvent(text) {
+  if (!text || !text.trim()) return;
+  const t = text.trim();
+  longTermMemory.events.push({ id: mkId("evt"), text: t, ts: Date.now() });
+  // keep events bounded to last 200
+  if (longTermMemory.events.length > 200) longTermMemory.events.shift();
+  saveLongTermMemory();
+}
+
+function updateRelationship(text, deltaScore = 0.2) {
+  // Pick "primary" relationship entry (index 0) or create one
+  const t = text.trim();
+  if (!t) return;
+  if (!longTermMemory.relationships.length) {
+    longTermMemory.relationships.push({ id: mkId("rel"), text: t, score: deltaScore, sourceTs: Date.now() });
+  } else {
+    // update score and optionally update text
+    const rel = longTermMemory.relationships[0];
+    rel.score = Math.max(-5, Math.min(5, (rel.score || 0) + deltaScore));
+    // if new text seems to add new info, append as short note (avoid duplicate)
+    if (!rel.text.toLowerCase().includes(t.toLowerCase()) && t.length < 200) {
+      rel.text = rel.text + " | " + t;
+    }
+    rel.sourceTs = Date.now();
+  }
+  saveLongTermMemory();
+}
+
+function adjustEmotion(delta = {}) {
+  // delta: {trust, affinity, tension, curiosity}
+  Object.keys(delta).forEach(k => {
+    if (k in longTermMemory.emotion) {
+      longTermMemory.emotion[k] = Math.max(-5, Math.min(5, (longTermMemory.emotion[k] || 0) + Number(delta[k] || 0)));
+    }
+  });
+  saveLongTermMemory();
+}
+
+/* ---------------------------
+   MEMORY EXTRACTION (heuristic)
+   --------------------------- */
+/*
+  Very lightweight heuristic extractor:
+  - Looks for "I am / I'm / My name is / I like / I love / I dislike / I hate / Remember that / We met at / We discovered"
+  - Also picks up phrases that mention locations, nouns that look important (capitalized words)
+  - Adds to facts/world/events/relationship accordingly
+*/
+function extractMemoriesFromUserMessage(userMsg) {
+  if (!userMsg || !userMsg.trim()) return;
+
+  const text = userMsg.trim();
+
+  // lower for checks
+  const lower = text.toLowerCase();
+
+  // direct personal facts
+  const personalFactPatterns = [
+    /i am ([a-z0-9 ,.'"-]+)/i,
+    /i'm ([a-z0-9 ,.'"-]+)/i,
+    /my name is ([a-z0-9 ,.'"-]+)/i,
+    /i (?:like|love) ([a-z0-9 ,.'"-]+)/i,
+    /i (?:dislike|hate|don't like) ([a-z0-9 ,.'"-]+)/i,
+    /i (?:work|study) as ([a-z0-9 ,.'"-]+)/i
+  ];
+
+  for (const p of personalFactPatterns) {
+    const m = text.match(p);
+    if (m && m[1]) {
+      pushFact(capitalizeSentence(m[0]));
+    }
+  }
+
+  // memories about places/world: "in the library", "at the gate", "on the moon"
+  const worldPatterns = [
+    /in the ([a-z0-9 ]{3,30})/i,
+    /at the ([a-z0-9 ]{3,30})/i,
+    /on the ([a-z0-9 ]{3,30})/i,
+    /the ([A-Z][a-zA-Z0-9]{2,40})/g
+  ];
+  for (const p of worldPatterns) {
+    const m = text.match(p);
+    if (m) {
+      // if multiple matches, push each
+      (Array.isArray(m) ? m : [m]).forEach(match => {
+        // some matches are arrays - handle
+        const capture = Array.isArray(match) ? match[1] || match[0] : match;
+        if (capture && capture.length >= 3 && capture.length <= 80) {
+          pushWorld(capitalizeSentence(capture));
         }
+      });
+    }
+  }
 
-        /**
-         * Makes the API call to KoboldCpp and returns the AI's response.
-         * @param {string} fullPrompt The complete prompt string.
-         * @param {string} userName The name of the user.
-         * @param {string} characterName The name of the AI character.
-         * @returns {Promise<string>} A promise that resolves with the AI's response or an error message.
-         */
-        async function getKoboldCppResponse(fullPrompt, userName, characterName) {
-            // Dynamically create the stop sequence to prevent the AI from generating user's turns
-            const stop_sequence = [
-                `${userName}:`,
-                `\n${userName}:`,
-                `${characterName}:`, // Sometimes helpful if the model repeats its own name
-                `\n${characterName}:`,
-                "User:", // Generic fallbacks
-                "\nUser:",
-                "Bot:",
-                "\nBot:"
-            ];
-            const uniqueStopSequence = [...new Set(stop_sequence)]; // Remove duplicates
+  // event-like statements: "we met", "we discovered", "we found", "yesterday we"
+  const eventPatterns = [
+    /(we (?:met|discovered|found|saw|escaped|arrived|left|defeated) [a-z0-9 ,.'"-]+)/i,
+    /(yesterday|today|last night|this morning)[, ]+[a-z0-9 ,.'"-]+/i,
+    /remember that (.+)/i
+  ];
+  for (const p of eventPatterns) {
+    const m = text.match(p);
+    if (m && m[0]) {
+      pushEvent(capitalizeSentence(m[0]));
+    }
+  }
 
-            const data = {
-                prompt: fullPrompt,
-                max_length: 150,    // Max tokens to generate
-                temperature: 0.8,   // Creativity of the response
-                top_p: 0.9,         // Diversity of the response
-                rep_pen: 1.05,      // Repetition penalty
-                stop_sequence: uniqueStopSequence, // Dynamic stop sequence
-                do_sample: true     // Enable sampling for varied responses
-            };
+  // relationship cues: "I trust you", "I don't trust you", "I like you", "I hate you"
+  const relPatterns = [
+    /i (trust|like|love) (you|her|him|them)/i,
+    /i (?:dont|don't|do not) (trust|like|love) (you|her|him|them)/i,
+    /you (?:are|seem) (nice|kind|mean|cruel|rude)/i
+  ];
+  for (const p of relPatterns) {
+    const m = text.match(p);
+    if (m) {
+      if (m[1]) {
+        const word = m[1].toLowerCase();
+        if (["trust","like","love"].includes(word)) updateRelationship(`User expressed: ${m[0]}`, +0.6);
+        else updateRelationship(`User expressed: ${m[0]}`, -0.6);
+      } else {
+        updateRelationship(`User said: ${m[0]}`, 0.1);
+      }
+    }
+  }
 
-            try {
-                const response = await fetch(KOBOLDCPP_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
+  // emotional hints - small adjustments
+  if (lower.includes("thank") || lower.includes("thanks")) adjustEmotion({ trust: 0.2, affinity: 0.2 });
+  if (lower.includes("sorry")) adjustEmotion({ trust: -0.1, affinity: -0.1, tension: -0.1 });
+  if (lower.includes("kill") || lower.includes("hate") || lower.includes("die")) adjustEmotion({ tension: 0.5 });
 
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const errorMessage = errorData.detail && errorData.detail.msg ? errorData.detail.msg : `HTTP error! Status: ${response.status}`;
-                    throw new Error(`API Error: ${errorMessage}`);
-                }
+  // finally, a fallback: if user message short and seems important, add as a fact
+  if (text.length > 8 && text.split(" ").length <= 6 && /[A-Za-z]/.test(text)) {
+    // sometimes a short line like "I like puzzles" is a fact
+    pushFact(capitalizeSentence(text));
+  }
+}
 
-                const jsonResponse = await response.json();
+/* ---------------------------
+   MEMORY SUMMARIZATION & PRUNING
+   --------------------------- */
+function summarizeLongTermMemoryIfNeeded() {
+  // Keep facts limited to 120 items, world to 120, relationships 10, events 300
+  if (longTermMemory.facts.length > 120) {
+    // naive prune: keep newest 100
+    longTermMemory.facts = longTermMemory.facts.slice(-100);
+  }
+  if (longTermMemory.world.length > 120) {
+    longTermMemory.world = longTermMemory.world.slice(-100);
+  }
+  if (longTermMemory.relationships.length > 10) {
+    longTermMemory.relationships = longTermMemory.relationships.slice(-10);
+  }
+  if (longTermMemory.events.length > 300) {
+    longTermMemory.events = longTermMemory.events.slice(-250);
+  }
+  saveLongTermMemory();
+}
 
-                if (jsonResponse.results && jsonResponse.results[0] && jsonResponse.results[0].text) {
-                    let text = jsonResponse.results[0].text.trim();
+/* ---------------------------
+   UI - Memory Panel
+   --------------------------- */
+const toggleMemoryBtn = document.getElementById("toggle-memory");
+const memoryPanel = document.getElementById("memory-panel");
+const memFacts = document.getElementById("mem-facts");
+const memRel = document.getElementById("mem-relationships");
+const memWorld = document.getElementById("mem-world");
+const memEvents = document.getElementById("mem-events");
+const memEmotion = document.getElementById("mem-emotion");
+const memoryClearBtn = document.getElementById("memory-clear");
 
-                    // Attempt to cut off incomplete sentences at the end
-                    const lastPeriod = text.lastIndexOf('.');
-                    const lastQuestion = text.lastIndexOf('?');
-                    const lastExclamation = text.lastIndexOf('!');
-                    const lastStop = Math.max(lastPeriod, lastQuestion, lastExclamation);
+toggleMemoryBtn.addEventListener("click", () => {
+  const showing = memoryPanel.classList.contains("panel-show");
+  if (showing) {
+    memoryPanel.classList.remove("panel-show");
+    memoryPanel.classList.add("panel-hidden");
+  } else {
+    memoryPanel.classList.remove("panel-hidden");
+    memoryPanel.classList.add("panel-show");
+    updateMemoryPanel();
+  }
+});
 
-                    if (lastStop !== -1 && lastStop < (text.length - 1)) {
-                        text = text.substring(0, lastStop + 1);
-                    }
+memoryClearBtn.addEventListener("click", () => {
+  if (!confirm("Clear all long-term memory? This cannot be undone.")) return;
+  longTermMemory = {
+    facts: [], relationships: [], world: [], events: [], emotion: { trust:0, affinity:0, tension:0, curiosity:0 },
+    metadata: { createdAt: Date.now(), lastUpdated: Date.now() }
+  };
+  saveLongTermMemory();
+  updateMemoryPanel();
+});
 
-                    // More robust removal of any premature "user" turns that the AI might generate
-                    for (const seq of uniqueStopSequence) {
-                        const pos = text.indexOf(seq);
-                        if (pos !== -1) {
-                            text = text.substring(0, pos);
-                            break; // Stop after the first found sequence
-                        }
-                    }
+function updateMemoryPanel() {
+  memFacts.innerHTML = longTermMemory.facts.length ? longTermMemory.facts.slice(-30).map(f => `• ${escapeHtml(f.text)}`).join("<br>") : "<i class='meta'>No facts yet</i>";
+  memRel.innerHTML = longTermMemory.relationships.length ? longTermMemory.relationships.map(r => `• ${escapeHtml(r.text)} (score: ${Number(r.score).toFixed(1)})`).join("<br>") : "<i class='meta'>No relationships yet</i>";
+  memWorld.innerHTML = longTermMemory.world.length ? longTermMemory.world.slice(-30).map(w => `• ${escapeHtml(w.text)}`).join("<br>") : "<i class='meta'>No world lore yet</i>";
+  memEvents.innerHTML = longTermMemory.events.length ? longTermMemory.events.slice(-30).map(e => `• ${escapeHtml(e.text)} (${new Date(e.ts).toLocaleDateString()})`).join("<br>") : "<i class='meta'>No events yet</i>";
+  memEmotion.innerHTML = `Trust: ${Number(longTermMemory.emotion.trust).toFixed(2)}, Affinity: ${Number(longTermMemory.emotion.affinity).toFixed(2)}, Tension: ${Number(longTermMemory.emotion.tension).toFixed(2)}, Curiosity: ${Number(longTermMemory.emotion.curiosity).toFixed(2)}`;
+}
 
-                    return text.trim();
+/* ---------------------------
+   PROMPT BUILDER
+   --------------------------- */
+const ABSOLUTE_SYSTEM_PROMPT = `
+SYSTEM: You are a roleplay engine and MUST always stay in character.
+- Never reveal you are an AI, program, or assistant.
+- Always speak in first-person as the character.
+- Never output any user lines (e.g., "Player:", "User:").
+- Follow the Character Sheet, World Rules, and Player Notes. If conflicts arise, System and World Rules take precedence.
+- Avoid explicit sexual content, hate, and instructions for real-world wrongdoing. Provide safe in-character refusals if needed.
+END SYSTEM.
+`;
 
-                } else {
-                    throw new Error("Unexpected API response structure or no text generated.");
-                }
-            } catch (error) {
-                console.error("API Call Error:", error);
-                return `Error: ${error.message || "An unknown error occurred during API call."}`;
-            }
-        }
+/**
+ * Build a compact memory summary to inject into the prompt.
+ * We keep the most relevant items:
+ * - top 4 facts
+ * - top 3 world items
+ * - last 6 events
+ * - relationship summary (first one)
+ * - emotional state
+ */
+function buildMemorySummary() {
+  const topFacts = longTermMemory.facts.slice(-6).map(f => f.text);
+  const topWorld = longTermMemory.world.slice(-6).map(w => w.text);
+  const lastEvents = longTermMemory.events.slice(-6).map(e => `${new Date(e.ts).toLocaleDateString()}: ${e.text}`);
+  const rel = longTermMemory.relationships.length ? `${longTermMemory.relationships[0].text} (score=${Number(longTermMemory.relationships[0].score).toFixed(1)})` : "(no relationship data)";
+  const emo = `Emotion - trust:${Number(longTermMemory.emotion.trust).toFixed(2)}, affinity:${Number(longTermMemory.emotion.affinity).toFixed(2)}, tension:${Number(longTermMemory.emotion.tension).toFixed(2)}, curiosity:${Number(longTermMemory.emotion.curiosity).toFixed(2)}`;
 
-        // --- Event Listeners and Initial Setup ---
+  return [
+    "--- MEMORY SUMMARY ---",
+    topFacts.length ? `Facts: ${topFacts.join("; ")}` : "Facts: (none)",
+    topWorld.length ? `World: ${topWorld.join("; ")}` : "World: (none)",
+    lastEvents.length ? `Recent events: ${lastEvents.join(" | ")}` : "Recent events: (none)",
+    `Relationship: ${rel}`,
+    emo,
+    "----------------------"
+  ].join("\n");
+}
 
-        // Load saved settings from localStorage when the page loads
-        window.onload = function() {
-            const savedUserName = localStorage.getItem('userName');
-            const savedCharacterName = localStorage.getItem('characterName');
-            const savedPersona = localStorage.getItem('characterPersona');
+function buildFullPrompt({characterSheet, worldRules, playerNotes, conversationWindow, userName, characterName}) {
+  // conversationWindow: array of {role,content}
+  const safe = s => (s||"").toString().trim();
 
-            characterPersonaInput.value = savedPersona || DEFAULT_ASSISTANT_PERSONA; // Set default or saved persona
-            if (savedUserName) userNameInput.value = savedUserName;
-            if (savedCharacterName) characterNameInput.value = savedCharacterName;
-        };
+  const parts = [];
+  parts.push(ABSOLUTE_SYSTEM_PROMPT.trim());
+  parts.push("\n--- CHARACTER SHEET ---");
+  parts.push(`Name: ${safe(characterName) || "Character"}`);
+  parts.push(safe(characterSheet) || "(no sheet)");
+  parts.push("\n--- WORLD RULES ---");
+  parts.push(safe(worldRules) || "(no world rules)");
+  parts.push("\n--- MEMORY ---");
+  parts.push(buildMemorySummary());
+  parts.push("\n--- PLAYER NOTES (flavor only) ---");
+  parts.push(safe(playerNotes) || "(none)");
+  parts.push("\n--- RECENT DIALOGUE ---");
+  if (Array.isArray(conversationWindow) && conversationWindow.length) {
+    conversationWindow.forEach(m => {
+      if (m.role === "user") parts.push(`${userName}: ${m.content}`);
+      else parts.push(`${characterName}: ${m.content}`);
+    });
+  } else {
+    parts.push("(no recent dialogue)");
+  }
+  parts.push("\n--- RESPONSE INSTRUCTIONS ---");
+  parts.push(`Respond as ${characterName} in first-person. Keep responses concise (roughly 1-6 sentences). Stay in-character. Do not output ${userName}: or any user lines. End with an action or emotional beat when appropriate.`);
+  parts.push(`\n${characterName}:`);
 
-        // Handle "Start Chat" button click
-        startChatButton.addEventListener('click', function() {
-            currentUserName = userNameInput.value.trim();
-            currentCharacterName = characterNameInput.value.trim();
-            currentPersona = characterPersonaInput.value.trim();
+  return parts.join("\n");
+}
 
-            if (!currentUserName || !currentCharacterName || !currentPersona) {
-                alert("Please fill in all fields (Your Name, Character's Name, and Persona) to start the chat!");
-                return;
-            }
+/* ---------------------------
+   CORE CHAT & UI HANDLERS
+   --------------------------- */
+const userNameInputEl = document.getElementById("user-name-input");
+const characterNameInputEl = document.getElementById("character-name-input");
+const charSheetEl = document.getElementById("character-sheet-input");
+const playerNotesEl = document.getElementById("player-notes-input");
+const worldRulesEl = document.getElementById("world-rules-input");
 
-            // Save current settings to localStorage
-            localStorage.setItem('userName', currentUserName);
-            localStorage.setItem('characterName', currentCharacterName);
-            localStorage.setItem('characterPersona', currentPersona);
+const startChatButtonEl = document.getElementById("start-chat-button");
+const clearHistoryEl = document.getElementById("clear-history");
+const exportBtnEl = document.getElementById("export-btn");
 
-            // Initialize conversation history with the character's first greeting
-            const initialGreeting = `Hello ${currentUserName}! I am ${currentCharacterName}. How may I assist you today?`;
-            conversationHistory = [
-                { role: 'bot', content: initialGreeting }
-            ];
+const chatboxEl = document.getElementById("chatbox");
+const userInputEl = document.getElementById("user_input");
+const sendBtnEl = document.getElementById("send_button");
+const typingIndicatorEl = document.getElementById("typing-indicator");
+const typingTextEl = document.getElementById("typing-text");
+const charAvatarEl = document.getElementById("char-avatar");
+const charNameDisplayEl = document.getElementById("character-name-display");
+const charBioMiniEl = document.getElementById("character-bio-mini");
+const persistSwitchEl = document.getElementById("persist-switch");
 
-            // UI transitions
-            settingsScreen.style.display = 'none';
-            chatScreen.classList.remove('hidden'); // Use Tailwind's hidden class to show chat screen
-            characterNameDisplay.textContent = currentCharacterName; // Update chat header with character name
-            typingName.textContent = currentCharacterName; // Update typing indicator name
-            
-            // Append the initial greeting message to the chatbox
-            appendMessage('bot', conversationHistory[0].content, true); // `true` for initial styling
-            userInputField.focus(); // Automatically focus the input field
-        });
+let conversationHistory = []; // {role:'user'|'bot', content, ts}
+let currentUserName = "";
+let currentCharacterName = "";
+let isWaitingForResponse = false;
 
-        // Handle "Back to Settings" button click
-        backToSettingsButton.addEventListener('click', function() {
-            chatScreen.classList.add('hidden'); // Hide chat screen
-            settingsScreen.style.display = 'block'; // Show settings screen
-            chatbox.innerHTML = ''; // Clear chatbox content
-            conversationHistory = []; // Clear conversation history
-        });
+// load persisted conversation if available
+const STATE_KEY = "krizrp_state_v1";
+function saveAppState() {
+  if (!persistSwitchEl.checked) return;
+  const payload = {
+    userName: userNameInputEl.value,
+    characterName: characterNameInputEl.value,
+    characterSheet: charSheetEl.value,
+    playerNotes: playerNotesEl.value,
+    worldRules: worldRulesEl.value,
+    conversationHistory,
+    createdAt: Date.now()
+  };
+  localStorage.setItem(STATE_KEY, JSON.stringify(payload));
+}
 
-        // Handle sending messages (button click or Enter key)
-        sendButton.addEventListener('click', sendMessage);
-        userInputField.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+function loadAppState() {
+  const raw = localStorage.getItem(STATE_KEY);
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    userNameInputEl.value = p.userName || "";
+    characterNameInputEl.value = p.characterName || "";
+    charSheetEl.value = p.characterSheet || charSheetEl.value;
+    playerNotesEl.value = p.playerNotes || playerNotesEl.value;
+    worldRulesEl.value = p.worldRules || worldRulesEl.value;
+    conversationHistory = p.conversationHistory || [];
+    currentUserName = p.userName || "";
+    currentCharacterName = p.characterName || "";
+    updateCharacterUI();
+    renderConversation();
+  } catch (e) {
+    console.warn("Failed to load app state", e);
+  }
+}
+loadAppState();
+updateMemoryPanel();
 
-        // --- Chat UI Helper Functions ---
+/* helper: simple HTML escape for displayed messages */
+function escapeHtml(s) {
+  if (!s) return "";
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'", "&#39;")
+    .replaceAll("\n","<br>");
+}
 
-        /**
-         * Appends a new message bubble to the chatbox.
-         * @param {string} sender 'user' or 'bot'.
-         * @param {string} text The message content.
-         * @param {boolean} isInitial Optional: true if it's the very first greeting (for special styling).
-         */
-        function appendMessage(sender, text, isInitial = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message-enter'); // Apply CSS animation class
-            
-            if (sender === 'user') {
-                messageDiv.innerHTML = `
-                    <div class="flex justify-end">
-                        <div class="max-w-xs md:max-w-md lg:max-w-lg bg-indigo-500 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-sm">
-                            ${text}
-                        </div>
-                    </div>
-                `;
-            } else { // sender === 'bot'
-                messageDiv.innerHTML = `
-                    <div class="flex justify-start">
-                        <div class="max-w-xs md:max-w-md lg:max-w-lg bg-white border border-gray-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
-                            ${isInitial ? text : `${currentCharacterName}: ${text}`}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            chatbox.appendChild(messageDiv);
-            chatbox.scrollTop = chatbox.scrollHeight; // Scroll to the bottom of the chat
-        }
+function appendMessageToUI(role, text) {
+  const wrapper = document.createElement("div");
+  wrapper.classList.add("msg-enter");
+  const timeLabel = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  if (role === "user") {
+    wrapper.innerHTML = `
+      <div class="flex justify-end">
+        <div class="max-w-[78%] msg-user px-4 py-3">
+          <div class="text-sm">${escapeHtml(text)}</div>
+          <div class="flex justify-end mt-2 meta">${timeLabel}</div>
+        </div>
+      </div>
+    `;
+  } else {
+    wrapper.innerHTML = `
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-full bg-white/6 flex items-center justify-center text-white font-medium">
+          ${escapeHtml(currentCharacterName.charAt(0) || "C")}
+        </div>
+        <div class="max-w-[86%] msg-bot px-4 py-3">
+          <div class="text-sm">${escapeHtml(text)}</div>
+          <div class="mt-2 meta">${timeLabel}</div>
+        </div>
+      </div>
+    `;
+  }
+  chatboxEl.appendChild(wrapper);
+  chatboxEl.scrollTop = chatboxEl.scrollHeight;
+}
 
-        /**
-         * Handles sending a user's message, calling the API, and displaying the response.
-         */
-        async function sendMessage() {
-            const userMessage = userInputField.value.trim();
-            if (userMessage === '') return; // Don't send empty messages
+/* render full conversation */
+function renderConversation() {
+  chatboxEl.innerHTML = "";
+  (conversationHistory || []).forEach(m => appendMessageToUI(m.role, m.content));
+}
 
-            appendMessage('user', userMessage); // Display user's message immediately
+/* update name and mini-bio */
+function updateCharacterUI() {
+  currentUserName = userNameInputEl.value.trim() || "Player";
+  currentCharacterName = characterNameInputEl.value.trim() || "Character";
+  charNameDisplayEl.textContent = currentCharacterName;
+  charAvatarEl.textContent = currentCharacterName.charAt(0) || "C";
+  charBioMiniEl.textContent = (charSheetEl.value || "").slice(0,120);
+}
 
-            userInputField.value = ''; // Clear input field
-            userInputField.disabled = true; // Disable input while waiting for response
-            sendButton.disabled = true; // Disable send button
-            typingIndicator.classList.remove('hidden'); // Show typing indicator
+/* clear history */
+clearHistoryEl.addEventListener("click", () => {
+  if (!confirm("Clear conversation history?")) return;
+  conversationHistory = [];
+  renderConversation();
+  saveAppState();
+});
 
-            // Add user's message to history for building the prompt
-            conversationHistory.push({ role: 'user', content: userMessage });
+/* start/resume chat */
+startChatButtonEl.addEventListener("click", () => {
+  updateCharacterUI();
+  // If no conversation, seed with greeting
+  if (!conversationHistory.length) {
+    const greeting = `Hello ${currentUserName}. I am ${currentCharacterName}. Shall we continue the story?`;
+    conversationHistory.push({ role: "bot", content: greeting, ts: Date.now() });
+    appendMessageToUI("bot", greeting);
+    saveAppState();
+  } else {
+    renderConversation();
+  }
+});
 
-            try {
-                // Build the full prompt and get AI response directly from JS
-                const fullPrompt = buildFullPrompt(currentPersona, currentUserName, currentCharacterName, conversationHistory);
-                const botResponse = await getKoboldCppResponse(fullPrompt, currentUserName, currentCharacterName);
+/* export transcript */
+exportBtnEl.addEventListener("click", () => {
+  const text = conversationHistory.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(currentCharacterName || "character")}_transcript.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
-                // Add bot's response to the history
-                conversationHistory.push({ role: 'bot', content: botResponse });
-                appendMessage('bot', botResponse); // Display bot's message
+/* send message handlers */
+sendBtnEl.addEventListener("click", () => sendMessageFromInput());
+userInputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessageFromInput();
+  }
+});
 
-            } catch (e) {
-                console.error("Error during message processing:", e);
-                conversationHistory.push({ role: 'bot', content: `Error: ${currentCharacterName} is having trouble responding. (${e.message || 'Unknown error'})` });
-                appendMessage('bot', `Error: ${currentCharacterName} is having trouble responding. (${e.message || 'Unknown error'})`);
-            } finally {
-                // Re-enable UI elements regardless of success or failure
-                typingIndicator.classList.add('hidden'); // Hide typing indicator
-                userInputField.disabled = false; // Re-enable input
-                sendButton.disabled = false; // Re-enable send button
-                userInputField.focus(); // Focus input for next message
-            }
-        }
-    </script>
+async function sendMessageFromInput() {
+  const text = userInputEl.value.trim();
+  if (!text) return;
+  if (isWaitingForResponse) return;
+  if (!currentCharacterName) {
+    alert("Please start the chat and set a character name.");
+    return;
+  }
+
+  // UI + history
+  conversationHistory.push({ role: "user", content: text, ts: Date.now() });
+  appendMessageToUI("user", text);
+  userInputEl.value = "";
+  saveAppState();
+
+  // Extract memories heuristically
+  try {
+    extractMemoriesFromUserMessage(text);
+    summarizeLongTermMemoryIfNeeded();
+  } catch (e) {
+    console.warn("Memory extraction failed", e);
+  }
+
+  // Build prompt and call model
+  isWaitingForResponse = true;
+  showTypingIndicator(true, currentCharacterName);
+
+  try {
+    // provide last 8 messages as window
+    const windowMsgs = conversationHistory.slice(-8);
+    const prompt = buildFullPrompt({
+      characterSheet: charSheetEl.value,
+      worldRules: worldRulesEl.value,
+      playerNotes: playerNotesEl.value,
+      conversationWindow: windowMsgs,
+      userName: currentUserName,
+      characterName: currentCharacterName
+    });
+
+    // Build stop sequences
+    const stopSeq = buildStopSequences(currentUserName, currentCharacterName);
+
+    // Call model (Kobold-like)
+    const raw = await getKoboldResponse({
+      prompt,
+      max_length: 220,
+      temperature: 0.78,
+      stop_sequences: stopSeq
+    });
+
+    const cleaned = sanitizeBotOutput(raw, currentUserName, currentCharacterName);
+    // push and display
+    conversationHistory.push({ role: "bot", content: cleaned, ts: Date.now() });
+    appendMessageToUI("bot", cleaned);
+
+    // optional: detect memory-worthy lines in bot output (character promises, discoveries)
+    detectMemoryFromBotOutput(cleaned);
+
+    saveAppState();
+    summarizeLongTermMemoryIfNeeded();
+  } catch (err) {
+    console.error("Generation error", err);
+    const fallback = `${currentCharacterName} is having trouble responding right now.`;
+    conversationHistory.push({ role: "bot", content: fallback, ts: Date.now() });
+    appendMessageToUI("bot", fallback);
+  } finally {
+    isWaitingForResponse = false;
+    showTypingIndicator(false);
+  }
+}
+
+/* small helper: show/hide typing indicator */
+function showTypingIndicator(show, text = "") {
+  if (show) {
+    typingTextEl.textContent = text ? `${text} is thinking…` : "Thinking…";
+    typingIndicatorEl.classList.remove("hidden");
+  } else {
+    typingIndicatorEl.classList.add("hidden");
+  }
+}
+
+/* ---------------------------
+   STOP SEQUENCE BUILDER
+   --------------------------- */
+function buildStopSequences(userName, characterName) {
+  const seq = [
+    `${userName}:`,
+    `\n${userName}:`,
+    `${characterName}:`,
+    `\n${characterName}:`,
+    "User:",
+    "\nUser:",
+    "Player:",
+    "\nPlayer:",
+    "Bot:",
+    "\nBot:"
+  ];
+  return [...new Set(seq)];
+}
+
+/* ---------------------------
+   MODEL CALL (Kobold-like endpoint)
+   --------------------------- */
+const KOBOLDCPP_API_URL = "https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate";
+
+async function getKoboldResponse({ prompt, max_length = 150, temperature = 0.8, stop_sequences = [] }) {
+  const payload = {
+    prompt,
+    max_length,
+    temperature,
+    top_p: 0.9,
+    rep_pen: 1.05,
+    do_sample: true,
+    stop_sequence: stop_sequences
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+
+  try {
+    const res = await fetch(KOBOLDCPP_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${res.statusText} ${txt}`);
+    }
+    const json = await res.json();
+
+    // Handle multiple possible shapes
+    if (json && json.results && Array.isArray(json.results) && json.results[0] && json.results[0].text) {
+      return json.results[0].text;
+    }
+    if (json && typeof json.text === "string") return json.text;
+    // fallback
+    return JSON.stringify(json);
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error("API error:", err);
+    throw err;
+  }
+}
+
+/* ---------------------------
+   SANITIZE BOT OUTPUT
+   --------------------------- */
+function sanitizeBotOutput(raw, userName, characterName) {
+  if (!raw) return "(the character is silent)";
+  let s = String(raw).trim();
+
+  // truncate at first explicit stop sequence
+  const stops = buildStopSequences(userName, characterName);
+  for (const seq of stops) {
+    const idx = s.indexOf(seq);
+    if (idx !== -1) s = s.substring(0, idx).trim();
+  }
+
+  // remove if model repeated the character name at start
+  const charNamePattern = new RegExp("^" + escapeRegExp(characterName) + "[:\\s,-]*", "i");
+  s = s.replace(charNamePattern, "").trim();
+
+  // remove excessive newlines
+  s = s.replace(/\n{3,}/g, "\n\n");
+
+  // safety: limit length
+  if (s.length > 1200) s = s.slice(0, 1180) + "…";
+
+  // final guard
+  if (!s) s = "(the character is silent)";
+
+  return s;
+}
+
+/* ---------------------------
+   DETECT MEMORY FROM BOT OUTPUT
+   --------------------------- */
+function detectMemoryFromBotOutput(text) {
+  if (!text || !text.trim()) return;
+  const lower = text.toLowerCase();
+
+  // if bot makes promises or statements about relationships
+  if (/i will (never|always|promise|swear)/i.test(text) || /i promise to/i.test(text)) {
+    pushEvent(`Promise: ${text}`);
+    updateRelationship(`Character promised: ${text}`, +0.8);
+  }
+
+  // if bot reveals location/world facts
+  const worldMatch = text.match(/(the [A-Z][a-zA-Z0-9 ]{2,40}|in the [a-z ]{3,60}|at the [a-z ]{3,60})/i);
+  if (worldMatch) {
+    pushWorld(capitalizeSentence(worldMatch[0]));
+  }
+
+  // if bot mentions discovery/event
+  if (/(we discovered|we found|we escaped|we defeated|we arrived)/i.test(text)) {
+    pushEvent(capitalizeSentence(text));
+  }
+
+  // minor emotion nudges when bot expresses feelings
+  if (lower.includes("i like you") || lower.includes("i love you")) adjustEmotion({ affinity: 0.6, trust: 0.3 });
+  if (lower.includes("i distrust") || lower.includes("i don't trust")) adjustEmotion({ trust: -0.8, tension: 0.6 });
+
+  saveLongTermMemory();
+}
+
+/* ---------------------------
+   UTILITIES
+   --------------------------- */
+function capitalizeSentence(s) {
+  if (!s) return s;
+  const t = s.trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/* ---------------------------
+   BOOT STRAP: auto-start if saved
+   --------------------------- */
+(function bootstrapUI() {
+  // If state exists, update UI elements
+  const raw = localStorage.getItem(STATE_KEY);
+  if (raw) {
+    try {
+      const p = JSON.parse(raw);
+      if (p) {
+        userNameInputEl.value = p.userName || userNameInputEl.value;
+        characterNameInputEl.value = p.characterName || characterNameInputEl.value;
+        charSheetEl.value = p.characterSheet || charSheetEl.value;
+        playerNotesEl.value = p.playerNotes || playerNotesEl.value;
+        worldRulesEl.value = p.worldRules || worldRulesEl.value;
+        conversationHistory = p.conversationHistory || conversationHistory;
+        updateCharacterUI();
+        renderConversation();
+      }
+    } catch (e) { /* ignore */ }
+  } else {
+    // initial demo greeting prefill
+    userNameInputEl.value = userNameInputEl.value || "Player";
+    characterNameInputEl.value = characterNameInputEl.value || "Luna";
+    charSheetEl.value = charSheetEl.value || "Luna is a cosmic librarian with soft humor, gentle mystery, and poetic tone.";
+  }
+  updateMemoryPanel();
+})();
+
+</script>
 </body>
 </html>
+
+/*  
+--------------------------------------------
+PART 2 of SCRIPT BELOW (send next message)
+--------------------------------------------
+*/
