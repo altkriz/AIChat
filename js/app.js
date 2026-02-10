@@ -1,6 +1,6 @@
 
 // Init external libs
-AOS.init();
+if (typeof AOS !== 'undefined') AOS.init();
 feather.replace();
 
 // Configure Marked with Highlight.js
@@ -449,15 +449,19 @@ const sidebar = document.querySelector(".sidebar");
 const sidebarOverlay = document.getElementById("sidebar-overlay");
 
 function toggleSidebar() {
-  sidebar.classList.toggle("open");
-  sidebarOverlay.classList.toggle("open");
+  if (sidebar && sidebarOverlay) {
+    sidebar.classList.toggle("open");
+    sidebarOverlay.classList.toggle("hidden"); // Use hidden class for overlay
+  }
 }
 
+// Event listeners handled in HTML (onclick) or here, but not both.
+// Cleaned up to avoid double-firing if HTML has onclick attributes.
 if (menuToggle) {
-  menuToggle.addEventListener("click", toggleSidebar);
+  menuToggle.onclick = toggleSidebar;
 }
 if (sidebarOverlay) {
-  sidebarOverlay.addEventListener("click", toggleSidebar);
+  sidebarOverlay.onclick = toggleSidebar;
 }
 
 
@@ -478,42 +482,49 @@ function escapeHtml(s) {
 
 function renderMessageContent(text) {
   if (typeof marked !== 'undefined') {
-    return marked.parse(text);
+    const rawHtml = marked.parse(text);
+    // Sanitize with DOMPurify if available
+    if (typeof DOMPurify !== 'undefined') {
+      return DOMPurify.sanitize(rawHtml);
+    }
+    return rawHtml;
   }
   return escapeHtml(text);
 }
 
 function appendMessageToUI(role, text) {
   const wrapper = document.createElement("div");
-  wrapper.classList.add("msg-enter");
+  wrapper.classList.add("msg-enter", "msg-container"); // Added msg-container
   const timeLabel = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
   const contentHtml = renderMessageContent(text);
 
   if (role === "user") {
+    wrapper.classList.add("msg-user");
     const avatarUrl = userAvatarInputEl && userAvatarInputEl.value.trim();
     const avatarHtml = avatarUrl
-      ? `<div class="w-10 h-10 rounded-full bg-cover bg-center border border-white/20 shadow-md ml-3" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>`
-      : "";
+      ? `<div class="w-10 h-10 rounded-full bg-cover bg-center ml-3 avatar-ring flex-shrink-0" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>`
+      : ""; // No fallback for user in this design
 
     wrapper.innerHTML = `
       <div class="flex justify-end items-start">
-        <div class="max-w-[78%] msg-user px-4 py-3 shadow-lg markdown-body text-sm">
+        <div class="max-w-[85%] bubble px-5 py-3 text-sm markdown-body">
           ${contentHtml}
-          <div class="flex justify-end mt-2 meta text-xs opacity-60 border-t border-white/10 pt-1">${timeLabel}</div>
+          <div class="flex justify-end mt-1 text-[10px] opacity-70 pt-1">${timeLabel}</div>
         </div>
         ${avatarHtml}
       </div>
     `;
   } else {
+    wrapper.classList.add("msg-bot");
     // Bot
     const avatarUrl = charAvatarInputEl && charAvatarInputEl.value.trim();
     // Use avatar url or default fallback
     let avatarEl = "";
     if (avatarUrl) {
-      avatarEl = `<div class="w-10 h-10 rounded-full bg-cover bg-center border border-white/20 shadow-md shrink-0" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>`;
+      avatarEl = `<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 avatar-ring" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>`;
     } else {
-      avatarEl = `<div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-medium shrink-0">
+      avatarEl = `<div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold shrink-0 avatar-ring">
           ${escapeHtml(currentCharacterName.charAt(0) || "C")}
         </div>`;
     }
@@ -521,9 +532,9 @@ function appendMessageToUI(role, text) {
     wrapper.innerHTML = `
       <div class="flex items-start gap-3">
         ${avatarEl}
-        <div class="max-w-[86%] msg-bot px-4 py-3 shadow-lg markdown-body text-sm">
+        <div class="max-w-[85%] bubble px-5 py-3 text-sm markdown-body">
           ${contentHtml}
-          <div class="mt-2 meta text-xs opacity-60 border-t border-white/10 pt-1">${timeLabel}</div>
+          <div class="mt-1 text-[10px] opacity-60 pt-1">${timeLabel}</div>
         </div>
       </div>
     `;
