@@ -361,10 +361,8 @@ function saveState() {
     },
     history
   };
-  if (provider === 'openrouter') {
-    headers['HTTP-Referer'] = window.location.origin || 'http://localhost';
-    headers['X-Title'] = 'KrizVibe RP Chat';
-  }
+  localStorage.setItem(STATE_KEY, JSON.stringify(payload));
+}
 
 function loadState() {
   const raw = localStorage.getItem(STATE_KEY);
@@ -402,6 +400,7 @@ function loadState() {
   } catch {
     // no-op
   }
+}
 
 async function fetchWithTimeout(url, options = {}, ms = 35000) {
   const controller = new AbortController();
