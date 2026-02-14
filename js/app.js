@@ -1,12 +1,10 @@
-
 // Init external libs
 if (typeof AOS !== 'undefined') AOS.init();
 feather.replace();
 
-// Configure Marked with Highlight.js
 if (typeof marked !== 'undefined') {
   marked.setOptions({
-    highlight: function(code, lang) {
+    highlight(code, lang) {
       if (typeof hljs !== 'undefined') {
         if (lang && hljs.getLanguage(lang)) {
           return hljs.highlight(code, { language: lang }).value;
@@ -21,34 +19,179 @@ if (typeof marked !== 'undefined') {
 }
 
 /* ---------------------------
-   LONG-TERM MEMORY (LTM)
+   Constants / defaults
    --------------------------- */
-const LTM_STORAGE_KEY = "kriz_rp_ltmemory_v1";
-let longTermMemory = {
-  facts: [],          // {id, text, sourceTs}
-  relationships: [],  // {id, text, score, sourceTs}
-  world: [],          // {id, text, sourceTs}
-  events: [],         // {id, text, ts}
-  emotion: {          // float values - -1..1 (but we use -5..5 scale internally)
-    trust: 0,
-    affinity: 0,
-    tension: 0,
-    curiosity: 0
+const STATE_KEY = 'krizrp_state_v2';
+const LTM_STORAGE_KEY = 'kriz_rp_ltmemory_v1';
+const DEFAULT_PROVIDER = 'kobold';
+
+const PROVIDER_DEFAULTS = {
+  kobold: {
+    apiUrl: 'https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate',
+    model: '',
+    needsKey: false
   },
-  metadata: {
-    createdAt: Date.now(),
-    lastUpdated: Date.now()
+  openai: {
+    apiUrl: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o-mini',
+    needsKey: true
+  },
+  groq: {
+    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile',
+    needsKey: true
+  },
+  openrouter: {
+    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
+    model: 'openai/gpt-4o-mini',
+    needsKey: true
+  },
+  custom_openai: {
+    apiUrl: 'https://api.openai.com/v1/chat/completions',
+    model: '',
+    needsKey: true
   }
 };
 
-function saveLongTermMemory() {
-  try {
-    longTermMemory.metadata.lastUpdated = Date.now();
-    localStorage.setItem(LTM_STORAGE_KEY, JSON.stringify(longTermMemory));
-    updateMemoryPanel();
-  } catch (e) {
-    console.warn("Failed to save LTM:", e);
+const DEFAULT_PROMPT_TEMPLATE = `You are {{char}}, a dedicated roleplay character.
+Stay fully in character in first-person.
+Never roleplay for {{user}}.
+
+Character Persona:
+{{persona}}
+
+Scenario:
+{{scenario}}
+
+World Rules:
+{{world_rules}}
+
+Player Notes:
+{{player_notes}}
+
+Memory Summary:
+{{memory}}
+
+Style Rules:
+- Keep responses immersive, specific, and scene-aware.
+- Respect safety boundaries while staying in character.
+- Avoid assistant disclaimers and OOC unless explicitly requested.`;
+
+let longTermMemory = {
+  facts: [],
+  relationships: [],
+  world: [],
+  events: [],
+  emotion: { trust: 0, affinity: 0, tension: 0, curiosity: 0 },
+  metadata: { createdAt: Date.now(), lastUpdated: Date.now() }
+};
+
+let conversationHistory = [];
+let currentUserName = '';
+let currentCharacterName = '';
+let isWaitingForResponse = false;
+
+/* ---------------------------
+   DOM refs
+   --------------------------- */
+const userNameInputEl = document.getElementById('user-name-input');
+const characterNameInputEl = document.getElementById('character-name-input');
+const charSheetEl = document.getElementById('character-sheet-input');
+const playerNotesEl = document.getElementById('player-notes-input');
+const worldRulesEl = document.getElementById('world-rules-input');
+const promptTemplateEl = document.getElementById('prompt-template-input');
+
+const providerSelectEl = document.getElementById('provider-select');
+const apiUrlInputEl = document.getElementById('api-url-input');
+const apiKeyInputEl = document.getElementById('api-key-input');
+const modelInputEl = document.getElementById('model-input');
+const providerHintEl = document.getElementById('provider-hint');
+
+const userAvatarInputEl = document.getElementById('user-avatar-input');
+const charAvatarInputEl = document.getElementById('char-avatar-input');
+const tavernCardInputEl = document.getElementById('tavern-card-input');
+const tavernCardStatusEl = document.getElementById('tavern-card-status');
+
+const startChatButtonEl = document.getElementById('start-chat-button');
+const mobileStartBtnEl = document.getElementById('mobile-start-btn');
+const clearHistoryEl = document.getElementById('clear-history');
+const exportBtnEl = document.getElementById('export-btn');
+const resetPromptBtnEl = document.getElementById('reset-prompt-btn');
+
+const chatboxEl = document.getElementById('chatbox');
+const userInputEl = document.getElementById('user_input');
+const sendBtnEl = document.getElementById('send_button');
+const typingIndicatorEl = document.getElementById('typing-indicator');
+const typingTextEl = document.getElementById('typing-text');
+const charAvatarEl = document.getElementById('char-avatar');
+const charNameDisplayEl = document.getElementById('character-name-display');
+const charBioMiniEl = document.getElementById('character-bio-mini');
+const persistSwitchEl = document.getElementById('persist-switch');
+
+const toggleMemoryBtn = document.getElementById('toggle-memory');
+const memoryPanel = document.getElementById('memory-panel');
+const memFacts = document.getElementById('mem-facts');
+const memRel = document.getElementById('mem-relationships');
+const memWorld = document.getElementById('mem-world');
+const memEvents = document.getElementById('mem-events');
+const memEmotion = document.getElementById('mem-emotion');
+const memoryClearBtn = document.getElementById('memory-clear');
+
+/* --------------------------- */
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderMessageContent(text) {
+  if (typeof marked !== 'undefined') {
+    const rawHtml = marked.parse(text || '');
+    if (typeof DOMPurify !== 'undefined') return DOMPurify.sanitize(rawHtml);
+    return rawHtml;
   }
+  return escapeHtml(text || '').replaceAll('\n', '<br>');
+}
+
+function mkId(prefix = 'm') {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function capitalizeSentence(s) {
+  if (!s) return s;
+  const t = s.trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function buildStopSequences(userName, characterName) {
+  const seq = [`${userName}:`, `\n${userName}:`, `${characterName}:`, `\n${characterName}:`, 'User:', '\nUser:', 'Player:', '\nPlayer:'];
+  return [...new Set(seq)];
+}
+
+function sanitizeBotOutput(raw, userName, characterName) {
+  if (!raw) return '(the character is silent)';
+  let s = String(raw).trim();
+  for (const seq of buildStopSequences(userName, characterName)) {
+    const i = s.indexOf(seq);
+    if (i !== -1) s = s.slice(0, i).trim();
+  }
+  const charNamePattern = new RegExp(`^${characterName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s,-]*`, 'i');
+  s = s.replace(charNamePattern, '').trim().replace(/\n{3,}/g, '\n\n');
+  if (s.length > 1400) s = `${s.slice(0, 1380)}…`;
+  return s || '(the character is silent)';
+}
+
+/* ---------------------------
+   Memory
+   --------------------------- */
+function saveLongTermMemory() {
+  longTermMemory.metadata.lastUpdated = Date.now();
+  localStorage.setItem(LTM_STORAGE_KEY, JSON.stringify(longTermMemory));
+  updateMemoryPanel();
 }
 
 function loadLongTermMemory() {
@@ -56,71 +199,50 @@ function loadLongTermMemory() {
   if (!raw) return;
   try {
     const parsed = JSON.parse(raw);
-    // shallow validation
-    if (parsed && typeof parsed === "object") {
-      longTermMemory = Object.assign(longTermMemory, parsed);
-    }
+    if (parsed && typeof parsed === 'object') longTermMemory = Object.assign(longTermMemory, parsed);
   } catch (e) {
-    console.warn("Failed to load LTM:", e);
+    console.warn('Failed to load LTM', e);
   }
-}
-loadLongTermMemory();
-
-/* ---------------------------
-   MEMORY UTILS
-   --------------------------- */
-function mkId(prefix = "m") {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
 }
 
 function pushFact(text) {
-  if (!text || !text.trim()) return;
+  if (!text?.trim()) return;
   const t = text.trim();
-  // avoid duplicates (simple)
-  if (longTermMemory.facts.some(f => f.text.toLowerCase() === t.toLowerCase())) return;
-  longTermMemory.facts.push({ id: mkId("fact"), text: t, sourceTs: Date.now() });
+  if (longTermMemory.facts.some((f) => f.text.toLowerCase() === t.toLowerCase())) return;
+  longTermMemory.facts.push({ id: mkId('fact'), text: t, sourceTs: Date.now() });
   saveLongTermMemory();
 }
 
 function pushWorld(text) {
-  if (!text || !text.trim()) return;
+  if (!text?.trim()) return;
   const t = text.trim();
-  if (longTermMemory.world.some(w => w.text.toLowerCase() === t.toLowerCase())) return;
-  longTermMemory.world.push({ id: mkId("world"), text: t, sourceTs: Date.now() });
+  if (longTermMemory.world.some((w) => w.text.toLowerCase() === t.toLowerCase())) return;
+  longTermMemory.world.push({ id: mkId('world'), text: t, sourceTs: Date.now() });
   saveLongTermMemory();
 }
 
 function pushEvent(text) {
-  if (!text || !text.trim()) return;
-  const t = text.trim();
-  longTermMemory.events.push({ id: mkId("evt"), text: t, ts: Date.now() });
-  // keep events bounded to last 200
-  if (longTermMemory.events.length > 200) longTermMemory.events.shift();
+  if (!text?.trim()) return;
+  longTermMemory.events.push({ id: mkId('evt'), text: text.trim(), ts: Date.now() });
+  longTermMemory.events = longTermMemory.events.slice(-250);
   saveLongTermMemory();
 }
 
-function updateRelationship(text, deltaScore = 0.2) {
-  // Pick "primary" relationship entry (index 0) or create one
-  const t = text.trim();
-  if (!t) return;
+function updateRelationship(text, delta = 0.2) {
+  if (!text?.trim()) return;
   if (!longTermMemory.relationships.length) {
-    longTermMemory.relationships.push({ id: mkId("rel"), text: t, score: deltaScore, sourceTs: Date.now() });
+    longTermMemory.relationships.push({ id: mkId('rel'), text: text.trim(), score: delta, sourceTs: Date.now() });
   } else {
-    // update score and optionally update text
     const rel = longTermMemory.relationships[0];
-    rel.score = Math.max(-5, Math.min(5, (rel.score || 0) + deltaScore));
-    // if new text seems to add new info, append as short note (avoid duplicate)
-    if (!rel.text.toLowerCase().includes(t.toLowerCase()) && t.length < 200) {
-      rel.text = rel.text + " | " + t;
-    }
+    rel.score = Math.max(-5, Math.min(5, (rel.score || 0) + delta));
+    if (!rel.text.toLowerCase().includes(text.toLowerCase())) rel.text += ` | ${text.trim()}`;
     rel.sourceTs = Date.now();
   }
   saveLongTermMemory();
 }
 
 function adjustEmotion(delta = {}) {
-  // delta: {trust, affinity, tension, curiosity}
-  Object.keys(delta).forEach(k => {
+  Object.keys(delta).forEach((k) => {
     if (k in longTermMemory.emotion) {
       longTermMemory.emotion[k] = Math.max(-5, Math.min(5, (longTermMemory.emotion[k] || 0) + Number(delta[k] || 0)));
     }
@@ -128,266 +250,228 @@ function adjustEmotion(delta = {}) {
   saveLongTermMemory();
 }
 
-/* ---------------------------
-   MEMORY EXTRACTION (heuristic)
-   --------------------------- */
 function extractMemoriesFromUserMessage(userMsg) {
-  if (!userMsg || !userMsg.trim()) return;
-
+  if (!userMsg?.trim()) return;
   const text = userMsg.trim();
+  [/i am ([^.,!?]{2,60})/i, /i'm ([^.,!?]{2,60})/i, /my name is ([^.,!?]{2,60})/i, /i (?:like|love) ([^.,!?]{2,60})/i].forEach((p) => {
+    const m = text.match(p);
+    if (m?.[0]) pushFact(capitalizeSentence(m[0]));
+  });
+  const world = text.match(/(in the [a-z0-9 ]{3,60}|at the [a-z0-9 ]{3,60}|on the [a-z0-9 ]{3,60})/i);
+  if (world?.[0]) pushWorld(capitalizeSentence(world[0]));
+  if (/(we met|we found|we discovered|remember that)/i.test(text)) pushEvent(capitalizeSentence(text));
+  if (/i trust you/i.test(text)) updateRelationship('User expressed trust', 0.6);
+  if (/i (?:hate|dislike|distrust) you/i.test(text)) updateRelationship('User expressed distrust', -0.6);
+}
 
-  // lower for checks
+function detectMemoryFromBotOutput(text) {
+  if (!text?.trim()) return;
   const lower = text.toLowerCase();
-
-  // direct personal facts
-  const personalFactPatterns = [
-    /i am ([a-z0-9 ,.'"-]+)/i,
-    /i'm ([a-z0-9 ,.'"-]+)/i,
-    /my name is ([a-z0-9 ,.'"-]+)/i,
-    /i (?:like|love) ([a-z0-9 ,.'"-]+)/i,
-    /i (?:dislike|hate|don't like) ([a-z0-9 ,.'"-]+)/i,
-    /i (?:work|study) as ([a-z0-9 ,.'"-]+)/i
-  ];
-
-  for (const p of personalFactPatterns) {
-    const m = text.match(p);
-    if (m && m[1]) {
-      pushFact(capitalizeSentence(m[0]));
-    }
-  }
-
-  // memories about places/world: "in the library", "at the gate", "on the moon"
-  const worldPatterns = [
-    /in the ([a-z0-9 ]{3,30})/i,
-    /at the ([a-z0-9 ]{3,30})/i,
-    /on the ([a-z0-9 ]{3,30})/i,
-    /the ([A-Z][a-zA-Z0-9]{2,40})/g
-  ];
-  for (const p of worldPatterns) {
-    const m = text.match(p);
-    if (m) {
-      // if multiple matches, push each
-      (Array.isArray(m) ? m : [m]).forEach(match => {
-        // some matches are arrays - handle
-        const capture = Array.isArray(match) ? match[1] || match[0] : match;
-        if (capture && capture.length >= 3 && capture.length <= 80) {
-          pushWorld(capitalizeSentence(capture));
-        }
-      });
-    }
-  }
-
-  // event-like statements: "we met", "we discovered", "we found", "yesterday we"
-  const eventPatterns = [
-    /(we (?:met|discovered|found|saw|escaped|arrived|left|defeated) [a-z0-9 ,.'"-]+)/i,
-    /(yesterday|today|last night|this morning)[, ]+[a-z0-9 ,.'"-]+/i,
-    /remember that (.+)/i
-  ];
-  for (const p of eventPatterns) {
-    const m = text.match(p);
-    if (m && m[0]) {
-      pushEvent(capitalizeSentence(m[0]));
-    }
-  }
-
-  // relationship cues: "I trust you", "I don't trust you", "I like you", "I hate you"
-  const relPatterns = [
-    /i (trust|like|love) (you|her|him|them)/i,
-    /i (?:dont|don't|do not) (trust|like|love) (you|her|him|them)/i,
-    /you (?:are|seem) (nice|kind|mean|cruel|rude)/i
-  ];
-  for (const p of relPatterns) {
-    const m = text.match(p);
-    if (m) {
-      if (m[1]) {
-        const word = m[1].toLowerCase();
-        if (["trust","like","love"].includes(word)) updateRelationship(`User expressed: ${m[0]}`, +0.6);
-        else updateRelationship(`User expressed: ${m[0]}`, -0.6);
-      } else {
-        updateRelationship(`User said: ${m[0]}`, 0.1);
-      }
-    }
-  }
-
-  // emotional hints - small adjustments
-  if (lower.includes("thank") || lower.includes("thanks")) adjustEmotion({ trust: 0.2, affinity: 0.2 });
-  if (lower.includes("sorry")) adjustEmotion({ trust: -0.1, affinity: -0.1, tension: -0.1 });
-  if (lower.includes("kill") || lower.includes("hate") || lower.includes("die")) adjustEmotion({ tension: 0.5 });
-
-  // finally, a fallback: if user message short and seems important, add as a fact
-  if (text.length > 8 && text.split(" ").length <= 6 && /[A-Za-z]/.test(text)) {
-    // sometimes a short line like "I like puzzles" is a fact
-    pushFact(capitalizeSentence(text));
-  }
+  if (/i promise|i swear|i will always|i will never/i.test(text)) pushEvent(`Promise: ${text}`);
+  if (/i like you|i love you/.test(lower)) adjustEmotion({ affinity: 0.5, trust: 0.2 });
+  if (/i distrust|i don't trust/.test(lower)) adjustEmotion({ trust: -0.7, tension: 0.6 });
 }
 
-/* ---------------------------
-   MEMORY SUMMARIZATION & PRUNING
-   --------------------------- */
-function summarizeLongTermMemoryIfNeeded() {
-  // Keep facts limited to 120 items, world to 120, relationships 10, events 300
-  if (longTermMemory.facts.length > 120) {
-    // naive prune: keep newest 100
-    longTermMemory.facts = longTermMemory.facts.slice(-100);
-  }
-  if (longTermMemory.world.length > 120) {
-    longTermMemory.world = longTermMemory.world.slice(-100);
-  }
-  if (longTermMemory.relationships.length > 10) {
-    longTermMemory.relationships = longTermMemory.relationships.slice(-10);
-  }
-  if (longTermMemory.events.length > 300) {
-    longTermMemory.events = longTermMemory.events.slice(-250);
-  }
-  saveLongTermMemory();
-}
-
-/* ---------------------------
-   UI - Memory Panel
-   --------------------------- */
-const toggleMemoryBtn = document.getElementById("toggle-memory");
-const memoryPanel = document.getElementById("memory-panel");
-const memFacts = document.getElementById("mem-facts");
-const memRel = document.getElementById("mem-relationships");
-const memWorld = document.getElementById("mem-world");
-const memEvents = document.getElementById("mem-events");
-const memEmotion = document.getElementById("mem-emotion");
-const memoryClearBtn = document.getElementById("memory-clear");
-
-if (toggleMemoryBtn) {
-  toggleMemoryBtn.addEventListener("click", () => {
-    const showing = memoryPanel.classList.contains("panel-show");
-    if (showing) {
-      memoryPanel.classList.remove("panel-show");
-      memoryPanel.classList.add("panel-hidden");
-    } else {
-      memoryPanel.classList.remove("panel-hidden");
-      memoryPanel.classList.add("panel-show");
-      updateMemoryPanel();
-    }
-  });
-}
-
-if (memoryClearBtn) {
-  memoryClearBtn.addEventListener("click", () => {
-    if (!confirm("Clear all long-term memory? This cannot be undone.")) return;
-    longTermMemory = {
-      facts: [], relationships: [], world: [], events: [], emotion: { trust:0, affinity:0, tension:0, curiosity:0 },
-      metadata: { createdAt: Date.now(), lastUpdated: Date.now() }
-    };
-    saveLongTermMemory();
-    updateMemoryPanel();
-  });
+function buildMemorySummary() {
+  const facts = longTermMemory.facts.slice(-6).map((f) => f.text).join('; ') || '(none)';
+  const world = longTermMemory.world.slice(-6).map((w) => w.text).join('; ') || '(none)';
+  const events = longTermMemory.events.slice(-6).map((e) => e.text).join(' | ') || '(none)';
+  const rel = longTermMemory.relationships.length ? `${longTermMemory.relationships[0].text} (score ${Number(longTermMemory.relationships[0].score).toFixed(1)})` : '(none)';
+  return `Facts: ${facts}\nWorld: ${world}\nEvents: ${events}\nRelationship: ${rel}`;
 }
 
 function updateMemoryPanel() {
   if (!memFacts) return;
-  memFacts.innerHTML = longTermMemory.facts.length ? longTermMemory.facts.slice(-30).map(f => `• ${escapeHtml(f.text)}`).join("<br>") : "<i class='meta'>No facts yet</i>";
-  memRel.innerHTML = longTermMemory.relationships.length ? longTermMemory.relationships.map(r => `• ${escapeHtml(r.text)} (score: ${Number(r.score).toFixed(1)})`).join("<br>") : "<i class='meta'>No relationships yet</i>";
-  memWorld.innerHTML = longTermMemory.world.length ? longTermMemory.world.slice(-30).map(w => `• ${escapeHtml(w.text)}`).join("<br>") : "<i class='meta'>No world lore yet</i>";
-  memEvents.innerHTML = longTermMemory.events.length ? longTermMemory.events.slice(-30).map(e => `• ${escapeHtml(e.text)} (${new Date(e.ts).toLocaleDateString()})`).join("<br>") : "<i class='meta'>No events yet</i>";
-  memEmotion.innerHTML = `Trust: ${Number(longTermMemory.emotion.trust).toFixed(2)}, Affinity: ${Number(longTermMemory.emotion.affinity).toFixed(2)}, Tension: ${Number(longTermMemory.emotion.tension).toFixed(2)}, Curiosity: ${Number(longTermMemory.emotion.curiosity).toFixed(2)}`;
+  memFacts.innerHTML = longTermMemory.facts.length ? longTermMemory.facts.slice(-20).map((f) => `• ${escapeHtml(f.text)}`).join('<br>') : '<i class="meta">No facts yet</i>';
+  memRel.innerHTML = longTermMemory.relationships.length ? longTermMemory.relationships.map((r) => `• ${escapeHtml(r.text)} (${Number(r.score).toFixed(1)})`).join('<br>') : '<i class="meta">No relationships yet</i>';
+  memWorld.innerHTML = longTermMemory.world.length ? longTermMemory.world.slice(-20).map((w) => `• ${escapeHtml(w.text)}`).join('<br>') : '<i class="meta">No lore yet</i>';
+  memEvents.innerHTML = longTermMemory.events.length ? longTermMemory.events.slice(-20).map((e) => `• ${escapeHtml(e.text)}`).join('<br>') : '<i class="meta">No events yet</i>';
+  memEmotion.innerHTML = `Trust ${longTermMemory.emotion.trust.toFixed(2)} | Affinity ${longTermMemory.emotion.affinity.toFixed(2)} | Tension ${longTermMemory.emotion.tension.toFixed(2)} | Curiosity ${longTermMemory.emotion.curiosity.toFixed(2)}`;
 }
 
 /* ---------------------------
-   PROMPT BUILDER
+   Prompt & model routing
    --------------------------- */
-const ABSOLUTE_SYSTEM_PROMPT = `
-SYSTEM: You are a roleplay engine and MUST always stay in character.
-- Never reveal you are an AI, program, or assistant.
-- Always speak in first-person as the character.
-- Never output any user lines (e.g., "Player:", "User:").
-- Follow the Character Sheet, World Rules, and Player Notes. If conflicts arise, System and World Rules take precedence.
-- Avoid explicit sexual content, hate, and instructions for real-world wrongdoing. Provide safe in-character refusals if needed.
-END SYSTEM.
-`;
-
-function buildMemorySummary() {
-  const topFacts = longTermMemory.facts.slice(-6).map(f => f.text);
-  const topWorld = longTermMemory.world.slice(-6).map(w => w.text);
-  const lastEvents = longTermMemory.events.slice(-6).map(e => `${new Date(e.ts).toLocaleDateString()}: ${e.text}`);
-  const rel = longTermMemory.relationships.length ? `${longTermMemory.relationships[0].text} (score=${Number(longTermMemory.relationships[0].score).toFixed(1)})` : "(no relationship data)";
-  const emo = `Emotion - trust:${Number(longTermMemory.emotion.trust).toFixed(2)}, affinity:${Number(longTermMemory.emotion.affinity).toFixed(2)}, tension:${Number(longTermMemory.emotion.tension).toFixed(2)}, curiosity:${Number(longTermMemory.emotion.curiosity).toFixed(2)}`;
-
-  return [
-    "--- MEMORY SUMMARY ---",
-    topFacts.length ? `Facts: ${topFacts.join("; ")}` : "Facts: (none)",
-    topWorld.length ? `World: ${topWorld.join("; ")}` : "World: (none)",
-    lastEvents.length ? `Recent events: ${lastEvents.join(" | ")}` : "Recent events: (none)",
-    `Relationship: ${rel}`,
-    emo,
-    "----------------------"
-  ].join("\n");
+function renderTemplate(template, vars) {
+  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, key) => vars[key] ?? '');
 }
 
-function buildFullPrompt({characterSheet, worldRules, playerNotes, conversationWindow, userName, characterName}) {
-  const safe = s => (s||"").toString().trim();
+function buildCompiledSystemPrompt() {
+  const persona = charSheetEl.value.trim();
+  const scenario = worldRulesEl.value.trim();
+  return renderTemplate(promptTemplateEl.value || DEFAULT_PROMPT_TEMPLATE, {
+    char: currentCharacterName || 'Character',
+    user: currentUserName || 'Player',
+    persona,
+    scenario,
+    world_rules: worldRulesEl.value.trim(),
+    player_notes: playerNotesEl.value.trim(),
+    memory: buildMemorySummary(),
+    history: conversationHistory.slice(-8).map((m) => `${m.role === 'user' ? currentUserName : currentCharacterName}: ${m.content}`).join('\n')
+  });
+}
 
-  const parts = [];
-  parts.push(ABSOLUTE_SYSTEM_PROMPT.trim());
-  parts.push("\n--- CHARACTER SHEET ---");
-  parts.push(`Name: ${safe(characterName) || "Character"}`);
-  parts.push(safe(characterSheet) || "(no sheet)");
-  parts.push("\n--- WORLD RULES ---");
-  parts.push(safe(worldRules) || "(no world rules)");
-  parts.push("\n--- MEMORY ---");
-  parts.push(buildMemorySummary());
-  parts.push("\n--- PLAYER NOTES (flavor only) ---");
-  parts.push(safe(playerNotes) || "(none)");
-  parts.push("\n--- RECENT DIALOGUE ---");
-  if (Array.isArray(conversationWindow) && conversationWindow.length) {
-    conversationWindow.forEach(m => {
-      if (m.role === "user") parts.push(`${userName}: ${m.content}`);
-      else parts.push(`${characterName}: ${m.content}`);
-    });
-  } else {
-    parts.push("(no recent dialogue)");
+function buildChatMessages() {
+  const messages = [{ role: 'system', content: buildCompiledSystemPrompt() }];
+  conversationHistory.slice(-12).forEach((m) => messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+  return messages;
+}
+
+async function requestKobold({ apiUrl, prompt, stop_sequences }) {
+  const payload = {
+    prompt,
+    max_length: 240,
+    temperature: 0.82,
+    top_p: 0.92,
+    rep_pen: 1.05,
+    do_sample: true,
+    stop_sequence: stop_sequences
+  };
+
+  const res = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`Kobold HTTP ${res.status}`);
+  const json = await res.json();
+  return json?.results?.[0]?.text || json?.text || '';
+}
+
+async function requestOpenAICompatible({ apiUrl, apiKey, model, provider, messages }) {
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`
+  };
+  if (provider === 'openrouter') {
+    headers['HTTP-Referer'] = window.location.origin || 'http://localhost';
+    headers['X-Title'] = 'KrizVibe RP Chat';
   }
-  parts.push("\n--- RESPONSE INSTRUCTIONS ---");
-  parts.push(`Respond as ${characterName} in first-person. Keep responses concise (roughly 1-6 sentences). Stay in-character. Do not output ${userName}: or any user lines. End with an action or emotional beat when appropriate.`);
-  parts.push(`\n${characterName}:`);
 
-  return parts.join("\n");
+  const payload = {
+    model,
+    messages,
+    temperature: 0.8,
+    max_tokens: 500
+  };
+
+  const res = await fetch(apiUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${provider} HTTP ${res.status} ${text}`);
+  }
+
+  const json = await res.json();
+  return json?.choices?.[0]?.message?.content || '';
+}
+
+async function generateRoleplayReply() {
+  const provider = providerSelectEl.value;
+  const apiUrl = apiUrlInputEl.value.trim();
+  const apiKey = apiKeyInputEl.value.trim();
+  const model = modelInputEl.value.trim();
+
+  if (!apiUrl) throw new Error('API URL is required');
+
+  if (provider === 'kobold') {
+    const prompt = `${buildCompiledSystemPrompt()}\n\n${conversationHistory.slice(-10).map((m) => `${m.role === 'user' ? currentUserName : currentCharacterName}: ${m.content}`).join('\n')}\n${currentCharacterName}:`;
+    return requestKobold({ apiUrl, prompt, stop_sequences: buildStopSequences(currentUserName, currentCharacterName) });
+  }
+
+  if (!apiKey) throw new Error('API key is required for this provider');
+  if (!model) throw new Error('Model is required for this provider');
+
+  return requestOpenAICompatible({ apiUrl, apiKey, model, provider, messages: buildChatMessages() });
 }
 
 /* ---------------------------
-   CORE CHAT & UI HANDLERS
+   UI behaviors
    --------------------------- */
-const userNameInputEl = document.getElementById("user-name-input");
-const characterNameInputEl = document.getElementById("character-name-input");
-const charSheetEl = document.getElementById("character-sheet-input");
-const playerNotesEl = document.getElementById("player-notes-input");
-const worldRulesEl = document.getElementById("world-rules-input");
+function updateProviderUI(fromChange = false) {
+  const config = PROVIDER_DEFAULTS[providerSelectEl.value] || PROVIDER_DEFAULTS.kobold;
+  if (fromChange) {
+    apiUrlInputEl.value = config.apiUrl;
+    modelInputEl.value = config.model;
+  }
+  apiKeyInputEl.type = config.needsKey ? 'password' : 'text';
+  apiKeyInputEl.placeholder = config.needsKey ? 'API Key (required)' : 'Not required for Kobold local/public';
+  providerHintEl.textContent = providerSelectEl.value === 'kobold'
+    ? 'Default Kobold endpoint works without key.'
+    : 'OpenAI-compatible provider selected. Use API key + model.';
+}
 
-// New Settings Inputs
-const apiUrlInputEl = document.getElementById("api-url-input");
-const userAvatarInputEl = document.getElementById("user-avatar-input");
-const charAvatarInputEl = document.getElementById("char-avatar-input");
+function updateCharacterUI() {
+  currentUserName = userNameInputEl.value.trim() || 'Player';
+  currentCharacterName = characterNameInputEl.value.trim() || 'Character';
+  charNameDisplayEl.textContent = currentCharacterName;
+  charBioMiniEl.textContent = (charSheetEl.value || '').slice(0, 120);
 
-const startChatButtonEl = document.getElementById("start-chat-button");
-const clearHistoryEl = document.getElementById("clear-history");
-const exportBtnEl = document.getElementById("export-btn");
+  const avatarUrl = charAvatarInputEl.value.trim();
+  if (avatarUrl) {
+    charAvatarEl.style.backgroundImage = `url('${escapeHtml(avatarUrl)}')`;
+    charAvatarEl.style.backgroundSize = 'cover';
+    charAvatarEl.textContent = '';
+  } else {
+    charAvatarEl.style.backgroundImage = '';
+    charAvatarEl.textContent = currentCharacterName.charAt(0) || 'C';
+  }
+}
 
-const chatboxEl = document.getElementById("chatbox");
-const userInputEl = document.getElementById("user_input");
-const sendBtnEl = document.getElementById("send_button");
-const typingIndicatorEl = document.getElementById("typing-indicator");
-const typingTextEl = document.getElementById("typing-text");
-const charAvatarEl = document.getElementById("char-avatar");
-const charNameDisplayEl = document.getElementById("character-name-display");
-const charBioMiniEl = document.getElementById("character-bio-mini");
-const persistSwitchEl = document.getElementById("persist-switch");
+function appendMessageToUI(role, text) {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('msg-enter', 'msg-container', role === 'user' ? 'msg-user' : 'msg-bot');
+  const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const contentHtml = renderMessageContent(text);
 
-let conversationHistory = []; // {role:'user'|'bot', content, ts}
-let currentUserName = "";
-let currentCharacterName = "";
-let isWaitingForResponse = false;
+  if (role === 'user') {
+    const avatarUrl = userAvatarInputEl.value.trim();
+    wrapper.innerHTML = `
+      <div class="flex justify-end items-start">
+        <div class="max-w-[85%] bubble px-5 py-3 text-sm markdown-body">
+          ${contentHtml}
+          <div class="flex justify-end mt-1 text-[10px] opacity-70 pt-1">${timeLabel}</div>
+        </div>
+        ${avatarUrl ? `<div class="w-10 h-10 rounded-full bg-cover bg-center ml-3 avatar-ring" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>` : ''}
+      </div>`;
+  } else {
+    const avatarUrl = charAvatarInputEl.value.trim();
+    const avatar = avatarUrl
+      ? `<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 avatar-ring" style="background-image:url('${escapeHtml(avatarUrl)}')"></div>`
+      : `<div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold shrink-0 avatar-ring">${escapeHtml(currentCharacterName.charAt(0) || 'C')}</div>`;
 
-// Default API URL
-const DEFAULT_KOBOLD_API_URL = "https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate";
+    wrapper.innerHTML = `
+      <div class="flex items-start gap-3">
+        ${avatar}
+        <div class="max-w-[85%] bubble px-5 py-3 text-sm markdown-body">
+          ${contentHtml}
+          <div class="mt-1 text-[10px] opacity-60 pt-1">${timeLabel}</div>
+        </div>
+      </div>`;
+  }
 
-// load persisted conversation if available
-const STATE_KEY = "krizrp_state_v1";
+  chatboxEl.appendChild(wrapper);
+  chatboxEl.scrollTop = chatboxEl.scrollHeight;
+  if (typeof hljs !== 'undefined') wrapper.querySelectorAll('pre code').forEach((b) => hljs.highlightElement(b));
+}
+
+function renderConversation() {
+  chatboxEl.innerHTML = '';
+  conversationHistory.forEach((m) => appendMessageToUI(m.role, m.content));
+}
+
+function showTypingIndicator(show, text = '') {
+  if (show) {
+    typingTextEl.textContent = text ? `${text} is thinking…` : 'Thinking…';
+    typingIndicatorEl.classList.remove('hidden');
+  } else {
+    typingIndicatorEl.classList.add('hidden');
+  }
+}
 
 function saveAppState() {
   if (!persistSwitchEl.checked) return;
@@ -397,453 +481,277 @@ function saveAppState() {
     characterSheet: charSheetEl.value,
     playerNotes: playerNotesEl.value,
     worldRules: worldRulesEl.value,
-
-    // New fields
-    apiUrl: apiUrlInputEl ? apiUrlInputEl.value : "",
-    userAvatarUrl: userAvatarInputEl ? userAvatarInputEl.value : "",
-    charAvatarUrl: charAvatarInputEl ? charAvatarInputEl.value : "",
-
-    conversationHistory,
-    createdAt: Date.now()
+    promptTemplate: promptTemplateEl.value,
+    provider: providerSelectEl.value,
+    apiUrl: apiUrlInputEl.value,
+    apiKey: apiKeyInputEl.value,
+    model: modelInputEl.value,
+    userAvatarUrl: userAvatarInputEl.value,
+    charAvatarUrl: charAvatarInputEl.value,
+    conversationHistory
   };
   localStorage.setItem(STATE_KEY, JSON.stringify(payload));
 }
 
 function loadAppState() {
   const raw = localStorage.getItem(STATE_KEY);
-  if (!raw) return;
-  try {
-    const p = JSON.parse(raw);
-    userNameInputEl.value = p.userName || "";
-    characterNameInputEl.value = p.characterName || "";
-    charSheetEl.value = p.characterSheet || charSheetEl.value;
-    playerNotesEl.value = p.playerNotes || playerNotesEl.value;
-    worldRulesEl.value = p.worldRules || worldRulesEl.value;
-
-    // Load new fields
-    if (apiUrlInputEl) apiUrlInputEl.value = p.apiUrl || DEFAULT_KOBOLD_API_URL;
-    if (userAvatarInputEl) userAvatarInputEl.value = p.userAvatarUrl || "";
-    if (charAvatarInputEl) charAvatarInputEl.value = p.charAvatarUrl || "";
-
-    conversationHistory = p.conversationHistory || [];
-    currentUserName = p.userName || "";
-    currentCharacterName = p.characterName || "";
-    updateCharacterUI();
-    renderConversation();
-  } catch (e) {
-    console.warn("Failed to load app state", e);
-  }
-}
-
-// Auto-resize textarea
-if (userInputEl) {
-  userInputEl.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = (this.style.scrollHeight) + 'px';
-  });
-}
-
-// Mobile sidebar toggle
-const menuToggle = document.getElementById("menu-toggle");
-const sidebar = document.querySelector(".sidebar");
-const sidebarOverlay = document.getElementById("sidebar-overlay");
-
-function toggleSidebar() {
-  if (sidebar && sidebarOverlay) {
-    sidebar.classList.toggle("open");
-    sidebarOverlay.classList.toggle("hidden"); // Use hidden class for overlay
-  }
-}
-
-// Event listeners handled in HTML (onclick) or here, but not both.
-// Cleaned up to avoid double-firing if HTML has onclick attributes.
-if (menuToggle) {
-  menuToggle.onclick = toggleSidebar;
-}
-if (sidebarOverlay) {
-  sidebarOverlay.onclick = toggleSidebar;
-}
-
-
-loadAppState();
-updateMemoryPanel();
-
-/* helper: simple HTML escape for displayed messages */
-function escapeHtml(s) {
-  if (!s) return "";
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'", "&#39;")
-    .replaceAll("\n","<br>");
-}
-
-function renderMessageContent(text) {
-  if (typeof marked !== 'undefined') {
-    const rawHtml = marked.parse(text);
-    // Sanitize with DOMPurify if available
-    if (typeof DOMPurify !== 'undefined') {
-      return DOMPurify.sanitize(rawHtml);
-    }
-    return rawHtml;
-  }
-  return escapeHtml(text);
-}
-
-function appendMessageToUI(role, text) {
-  const wrapper = document.createElement("div");
-  wrapper.classList.add("msg-enter", "msg-container"); // Added msg-container
-  const timeLabel = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-
-  const contentHtml = renderMessageContent(text);
-
-  if (role === "user") {
-    wrapper.classList.add("msg-user");
-    const avatarUrl = userAvatarInputEl && userAvatarInputEl.value.trim();
-    const avatarHtml = avatarUrl
-      ? `<div class="w-10 h-10 rounded-full bg-cover bg-center ml-3 avatar-ring flex-shrink-0" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>`
-      : ""; // No fallback for user in this design
-
-    wrapper.innerHTML = `
-      <div class="flex justify-end items-start">
-        <div class="max-w-[85%] bubble px-5 py-3 text-sm markdown-body">
-          ${contentHtml}
-          <div class="flex justify-end mt-1 text-[10px] opacity-70 pt-1">${timeLabel}</div>
-        </div>
-        ${avatarHtml}
-      </div>
-    `;
-  } else {
-    wrapper.classList.add("msg-bot");
-    // Bot
-    const avatarUrl = charAvatarInputEl && charAvatarInputEl.value.trim();
-    // Use avatar url or default fallback
-    let avatarEl = "";
-    if (avatarUrl) {
-      avatarEl = `<div class="w-10 h-10 rounded-full bg-cover bg-center shrink-0 avatar-ring" style="background-image: url('${escapeHtml(avatarUrl)}')"></div>`;
-    } else {
-      avatarEl = `<div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold shrink-0 avatar-ring">
-          ${escapeHtml(currentCharacterName.charAt(0) || "C")}
-        </div>`;
-    }
-
-    wrapper.innerHTML = `
-      <div class="flex items-start gap-3">
-        ${avatarEl}
-        <div class="max-w-[85%] bubble px-5 py-3 text-sm markdown-body">
-          ${contentHtml}
-          <div class="mt-1 text-[10px] opacity-60 pt-1">${timeLabel}</div>
-        </div>
-      </div>
-    `;
-  }
-  chatboxEl.appendChild(wrapper);
-  chatboxEl.scrollTop = chatboxEl.scrollHeight;
-
-  // Highlight new code blocks
-  if (typeof hljs !== 'undefined') {
-    wrapper.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block);
-    });
-  }
-}
-
-/* render full conversation */
-function renderConversation() {
-  chatboxEl.innerHTML = "";
-  (conversationHistory || []).forEach(m => appendMessageToUI(m.role, m.content));
-}
-
-/* update name and mini-bio */
-function updateCharacterUI() {
-  currentUserName = userNameInputEl.value.trim() || "Player";
-  currentCharacterName = characterNameInputEl.value.trim() || "Character";
-  charNameDisplayEl.textContent = currentCharacterName;
-
-  // Update main avatar if set
-  if (charAvatarInputEl && charAvatarInputEl.value.trim()) {
-    charAvatarEl.style.backgroundImage = `url('${escapeHtml(charAvatarInputEl.value.trim())}')`;
-    charAvatarEl.style.backgroundSize = 'cover';
-    charAvatarEl.textContent = '';
-  } else {
-    charAvatarEl.style.backgroundImage = '';
-    charAvatarEl.textContent = currentCharacterName.charAt(0) || "C";
-  }
-
-  charBioMiniEl.textContent = (charSheetEl.value || "").slice(0,120);
-}
-
-/* clear history */
-clearHistoryEl.addEventListener("click", () => {
-  if (!confirm("Clear conversation history?")) return;
-  conversationHistory = [];
-  renderConversation();
-  saveAppState();
-});
-
-/* start/resume chat */
-startChatButtonEl.addEventListener("click", () => {
-  updateCharacterUI();
-  // If no conversation, seed with greeting
-  if (!conversationHistory.length) {
-    const greeting = `Hello ${currentUserName}. I am ${currentCharacterName}. Shall we continue the story?`;
-    conversationHistory.push({ role: "bot", content: greeting, ts: Date.now() });
-    appendMessageToUI("bot", greeting);
-    saveAppState();
-  } else {
-    renderConversation();
-  }
-});
-
-/* export transcript */
-exportBtnEl.addEventListener("click", () => {
-  const text = conversationHistory.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
-  const blob = new Blob([text], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${(currentCharacterName || "character")}_transcript.txt`;
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-/* send message handlers */
-sendBtnEl.addEventListener("click", () => sendMessageFromInput());
-userInputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessageFromInput();
-  }
-});
-
-async function sendMessageFromInput() {
-  const text = userInputEl.value.trim();
-  if (!text) return;
-  if (isWaitingForResponse) return;
-  if (!currentCharacterName) {
-    alert("Please start the chat and set a character name.");
+  if (!raw) {
+    promptTemplateEl.value = DEFAULT_PROMPT_TEMPLATE;
+    providerSelectEl.value = DEFAULT_PROVIDER;
+    updateProviderUI(true);
     return;
   }
 
-  // UI + history
-  conversationHistory.push({ role: "user", content: text, ts: Date.now() });
-  appendMessageToUI("user", text);
-  userInputEl.value = "";
-  // Reset height
+  try {
+    const p = JSON.parse(raw);
+    userNameInputEl.value = p.userName || '';
+    characterNameInputEl.value = p.characterName || '';
+    charSheetEl.value = p.characterSheet || charSheetEl.value;
+    playerNotesEl.value = p.playerNotes || playerNotesEl.value;
+    worldRulesEl.value = p.worldRules || worldRulesEl.value;
+    promptTemplateEl.value = p.promptTemplate || DEFAULT_PROMPT_TEMPLATE;
+
+    providerSelectEl.value = p.provider || DEFAULT_PROVIDER;
+    apiUrlInputEl.value = p.apiUrl || PROVIDER_DEFAULTS[providerSelectEl.value].apiUrl;
+    apiKeyInputEl.value = p.apiKey || '';
+    modelInputEl.value = p.model || PROVIDER_DEFAULTS[providerSelectEl.value].model;
+
+    userAvatarInputEl.value = p.userAvatarUrl || '';
+    charAvatarInputEl.value = p.charAvatarUrl || '';
+    conversationHistory = p.conversationHistory || [];
+
+    updateProviderUI();
+    updateCharacterUI();
+    renderConversation();
+  } catch {
+    promptTemplateEl.value = DEFAULT_PROMPT_TEMPLATE;
+    providerSelectEl.value = DEFAULT_PROVIDER;
+    updateProviderUI(true);
+  }
+}
+
+async function sendMessageFromInput() {
+  const text = userInputEl.value.trim();
+  if (!text || isWaitingForResponse) return;
+  if (!currentCharacterName) return alert('Please click Start Session first.');
+
+  conversationHistory.push({ role: 'user', content: text, ts: Date.now() });
+  appendMessageToUI('user', text);
+  userInputEl.value = '';
   userInputEl.style.height = 'auto';
 
+  extractMemoriesFromUserMessage(text);
   saveAppState();
 
-  // Extract memories heuristically
-  try {
-    extractMemoriesFromUserMessage(text);
-    summarizeLongTermMemoryIfNeeded();
-  } catch (e) {
-    console.warn("Memory extraction failed", e);
-  }
-
-  // Build prompt and call model
   isWaitingForResponse = true;
   showTypingIndicator(true, currentCharacterName);
 
   try {
-    // provide last 8 messages as window
-    const windowMsgs = conversationHistory.slice(-8);
-    const prompt = buildFullPrompt({
-      characterSheet: charSheetEl.value,
-      worldRules: worldRulesEl.value,
-      playerNotes: playerNotesEl.value,
-      conversationWindow: windowMsgs,
-      userName: currentUserName,
-      characterName: currentCharacterName
-    });
-
-    // Build stop sequences
-    const stopSeq = buildStopSequences(currentUserName, currentCharacterName);
-
-    // Get configured API URL
-    const customApiUrl = apiUrlInputEl && apiUrlInputEl.value.trim()
-      ? apiUrlInputEl.value.trim()
-      : DEFAULT_KOBOLD_API_URL;
-
-    // Call model (Kobold-like)
-    const raw = await getKoboldResponse({
-      apiUrl: customApiUrl,
-      prompt,
-      max_length: 220,
-      temperature: 0.78,
-      stop_sequences: stopSeq
-    });
-
+    const raw = await generateRoleplayReply();
     const cleaned = sanitizeBotOutput(raw, currentUserName, currentCharacterName);
-    // push and display
-    conversationHistory.push({ role: "bot", content: cleaned, ts: Date.now() });
-    appendMessageToUI("bot", cleaned);
-
-    // optional: detect memory-worthy lines in bot output (character promises, discoveries)
+    conversationHistory.push({ role: 'bot', content: cleaned, ts: Date.now() });
+    appendMessageToUI('bot', cleaned);
     detectMemoryFromBotOutput(cleaned);
-
     saveAppState();
-    summarizeLongTermMemoryIfNeeded();
   } catch (err) {
-    console.error("Generation error", err);
-    const fallback = `${currentCharacterName} is having trouble responding right now. (Check API URL or connection)`;
-    conversationHistory.push({ role: "bot", content: fallback, ts: Date.now() });
-    appendMessageToUI("bot", fallback);
+    const msg = `${currentCharacterName} is having trouble replying. (${err.message || 'provider request failed'})`;
+    conversationHistory.push({ role: 'bot', content: msg, ts: Date.now() });
+    appendMessageToUI('bot', msg);
   } finally {
     isWaitingForResponse = false;
     showTypingIndicator(false);
   }
 }
 
-/* small helper: show/hide typing indicator */
-function showTypingIndicator(show, text = "") {
-  if (show) {
-    typingTextEl.textContent = text ? `${text} is thinking…` : "Thinking…";
-    typingIndicatorEl.classList.remove("hidden");
-  } else {
-    typingIndicatorEl.classList.add("hidden");
+/* ---------------------------
+   Tavern Card Import (AI Tavern / AImaker compatible)
+   --------------------------- */
+async function parseJsonCardText(text) {
+  const parsed = JSON.parse(text);
+  const card = parsed?.data || parsed;
+  return card;
+}
+
+function applyImportedCard(card) {
+  const name = card.name || card.char_name || '';
+  const desc = card.description || card.persona || '';
+  const personality = card.personality || '';
+  const scenario = card.scenario || '';
+  const firstMes = card.first_mes || card.greeting || '';
+  const mesExample = card.mes_example || '';
+  const systemPrompt = card.system_prompt || '';
+
+  if (name) characterNameInputEl.value = name;
+  const mergedPersona = [desc, personality].filter(Boolean).join('\n\n');
+  if (mergedPersona) charSheetEl.value = mergedPersona;
+  if (scenario) worldRulesEl.value = scenario;
+
+  if (systemPrompt) {
+    promptTemplateEl.value = `${systemPrompt}\n\n${DEFAULT_PROMPT_TEMPLATE}`;
   }
+
+  if (firstMes && !conversationHistory.length) {
+    conversationHistory.push({ role: 'bot', content: firstMes, ts: Date.now() });
+    if (mesExample) pushEvent(`Example style: ${mesExample.slice(0, 180)}`);
+  }
+
+  if (card.avatar) charAvatarInputEl.value = card.avatar;
+  updateCharacterUI();
+  renderConversation();
+  saveAppState();
 }
 
-/* ---------------------------
-   STOP SEQUENCE BUILDER
-   --------------------------- */
-function buildStopSequences(userName, characterName) {
-  const seq = [
-    `${userName}:`,
-    `\n${userName}:`,
-    `${characterName}:`,
-    `\n${characterName}:`,
-    "User:",
-    "\nUser:",
-    "Player:",
-    "\nPlayer:",
-    "Bot:",
-    "\nBot:"
-  ];
-  return [...new Set(seq)];
+function extractCharaFromPngArrayBuffer(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+  for (let i = 0; i < signature.length; i += 1) if (bytes[i] !== signature[i]) throw new Error('Invalid PNG file');
+
+  let offset = 8;
+  while (offset < bytes.length) {
+    const len = new DataView(buffer, offset, 4).getUint32(0);
+    const type = String.fromCharCode(...bytes.slice(offset + 4, offset + 8));
+    const chunkData = bytes.slice(offset + 8, offset + 8 + len);
+
+    if (type === 'tEXt') {
+      const text = new TextDecoder().decode(chunkData);
+      const nul = text.indexOf('\0');
+      if (nul > 0) {
+        const keyword = text.slice(0, nul);
+        const value = text.slice(nul + 1);
+        if (keyword.toLowerCase() === 'chara') {
+          const decoded = atob(value);
+          return JSON.parse(decoded);
+        }
+      }
+    }
+
+    offset += 12 + len;
+  }
+  throw new Error('No Tavern card metadata found in PNG');
 }
 
-/* ---------------------------
-   MODEL CALL (Kobold-like endpoint)
-   --------------------------- */
-
-async function getKoboldResponse({ apiUrl, prompt, max_length = 150, temperature = 0.8, stop_sequences = [] }) {
-  const payload = {
-    prompt,
-    max_length,
-    temperature,
-    top_p: 0.9,
-    rep_pen: 1.05,
-    do_sample: true,
-    stop_sequence: stop_sequences
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+async function importTavernCard(file) {
+  if (!file) return;
+  tavernCardStatusEl.textContent = 'Importing...';
 
   try {
-    const res = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${res.statusText} ${txt}`);
+    let card;
+    if (file.name.toLowerCase().endsWith('.png')) {
+      const buffer = await file.arrayBuffer();
+      card = extractCharaFromPngArrayBuffer(buffer);
+    } else {
+      const text = await file.text();
+      card = await parseJsonCardText(text);
     }
-    const json = await res.json();
 
-    // Handle multiple possible shapes
-    if (json && json.results && Array.isArray(json.results) && json.results[0] && json.results[0].text) {
-      return json.results[0].text;
-    }
-    if (json && typeof json.text === "string") return json.text;
-    // fallback
-    return JSON.stringify(json);
-  } catch (err) {
-    clearTimeout(timeout);
-    console.error("API error:", err);
-    throw err;
+    applyImportedCard(card);
+    tavernCardStatusEl.textContent = `Imported: ${card.name || file.name}`;
+  } catch (e) {
+    tavernCardStatusEl.textContent = `Import failed: ${e.message}`;
   }
 }
 
 /* ---------------------------
-   SANITIZE BOT OUTPUT
+   Event wiring
    --------------------------- */
-function sanitizeBotOutput(raw, userName, characterName) {
-  if (!raw) return "(the character is silent)";
-  let s = String(raw).trim();
+const menuToggle = document.getElementById('menu-toggle');
+const sidebar = document.querySelector('.sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
 
-  // truncate at first explicit stop sequence
-  const stops = buildStopSequences(userName, characterName);
-  for (const seq of stops) {
-    const idx = s.indexOf(seq);
-    if (idx !== -1) s = s.substring(0, idx).trim();
-  }
-
-  // remove if model repeated the character name at start
-  const charNamePattern = new RegExp("^" + escapeRegExp(characterName) + "[:\\s,-]*", "i");
-  s = s.replace(charNamePattern, "").trim();
-
-  // remove excessive newlines
-  s = s.replace(/\n{3,}/g, "\n\n");
-
-  // safety: limit length
-  if (s.length > 1200) s = s.slice(0, 1180) + "…";
-
-  // final guard
-  if (!s) s = "(the character is silent)";
-
-  return s;
+function toggleSidebar() {
+  sidebar?.classList.toggle('open');
+  sidebarOverlay?.classList.toggle('hidden');
 }
 
-/* ---------------------------
-   DETECT MEMORY FROM BOT OUTPUT
-   --------------------------- */
-function detectMemoryFromBotOutput(text) {
-  if (!text || !text.trim()) return;
-  const lower = text.toLowerCase();
+window.toggleSidebar = toggleSidebar;
+menuToggle && (menuToggle.onclick = toggleSidebar);
+sidebarOverlay && (sidebarOverlay.onclick = toggleSidebar);
 
-  // if bot makes promises or statements about relationships
-  if (/i will (never|always|promise|swear)/i.test(text) || /i promise to/i.test(text)) {
-    pushEvent(`Promise: ${text}`);
-    updateRelationship(`Character promised: ${text}`, +0.8);
+if (userInputEl) {
+  userInputEl.addEventListener('input', function onInput() {
+    this.style.height = 'auto';
+    this.style.height = `${this.scrollHeight}px`;
+  });
+}
+
+sendBtnEl.addEventListener('click', sendMessageFromInput);
+userInputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessageFromInput();
   }
+});
 
-  // if bot reveals location/world facts
-  const worldMatch = text.match(/(the [A-Z][a-zA-Z0-9 ]{2,40}|in the [a-z ]{3,60}|at the [a-z ]{3,60})/i);
-  if (worldMatch) {
-    pushWorld(capitalizeSentence(worldMatch[0]));
+startChatButtonEl.addEventListener('click', () => {
+  updateCharacterUI();
+  if (!conversationHistory.length) {
+    const greeting = `Hello ${currentUserName}. I am ${currentCharacterName}. Shall we begin this roleplay?`;
+    conversationHistory.push({ role: 'bot', content: greeting, ts: Date.now() });
+    appendMessageToUI('bot', greeting);
+  } else {
+    renderConversation();
   }
+  saveAppState();
+});
 
-  // if bot mentions discovery/event
-  if (/(we discovered|we found|we escaped|we defeated|we arrived)/i.test(text)) {
-    pushEvent(capitalizeSentence(text));
-  }
+mobileStartBtnEl?.addEventListener('click', () => startChatButtonEl.click());
 
-  // minor emotion nudges when bot expresses feelings
-  if (lower.includes("i like you") || lower.includes("i love you")) adjustEmotion({ affinity: 0.6, trust: 0.3 });
-  if (lower.includes("i distrust") || lower.includes("i don't trust")) adjustEmotion({ trust: -0.8, tension: 0.6 });
+clearHistoryEl.addEventListener('click', () => {
+  if (!confirm('Clear conversation history?')) return;
+  conversationHistory = [];
+  renderConversation();
+  saveAppState();
+});
 
+exportBtnEl.addEventListener('click', () => {
+  const text = conversationHistory.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(currentCharacterName || 'character').replace(/\s+/g, '_')}_transcript.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+providerSelectEl.addEventListener('change', () => {
+  updateProviderUI(true);
+  saveAppState();
+});
+
+[apiUrlInputEl, apiKeyInputEl, modelInputEl, userNameInputEl, characterNameInputEl, charSheetEl, playerNotesEl, worldRulesEl, promptTemplateEl, userAvatarInputEl, charAvatarInputEl, persistSwitchEl]
+  .forEach((el) => el?.addEventListener('input', () => {
+    if (el === characterNameInputEl || el === charSheetEl || el === charAvatarInputEl || el === userNameInputEl) updateCharacterUI();
+    saveAppState();
+  }));
+
+resetPromptBtnEl?.addEventListener('click', () => {
+  promptTemplateEl.value = DEFAULT_PROMPT_TEMPLATE;
+  saveAppState();
+});
+
+tavernCardInputEl?.addEventListener('change', () => {
+  const file = tavernCardInputEl.files?.[0];
+  importTavernCard(file);
+});
+
+toggleMemoryBtn?.addEventListener('click', () => {
+  memoryPanel.classList.toggle('hidden');
+  updateMemoryPanel();
+});
+
+memoryClearBtn?.addEventListener('click', () => {
+  if (!confirm('Clear all long-term memory?')) return;
+  longTermMemory = {
+    facts: [], relationships: [], world: [], events: [],
+    emotion: { trust: 0, affinity: 0, tension: 0, curiosity: 0 },
+    metadata: { createdAt: Date.now(), lastUpdated: Date.now() }
+  };
   saveLongTermMemory();
-}
+});
 
-/* ---------------------------
-   UTILITIES
-   --------------------------- */
-function capitalizeSentence(s) {
-  if (!s) return s;
-  const t = s.trim();
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+loadLongTermMemory();
+loadAppState();
+updateCharacterUI();
+updateMemoryPanel();
+feather.replace();

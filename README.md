@@ -1,87 +1,92 @@
-# 🤖 KrizVibe Chat (Modern AI RP Client)
+# KrizVibe Chat — Multi-Provider Roleplay Client
 
-A fully client-side (HTML, CSS, JavaScript) web application that allows users to create and chat with AI characters using the KoboldCpp API. This project provides a user-friendly, modern light-themed interface to define custom AI personas, set names, and engage in dynamic conversations directly in your browser.
+KrizVibe is a fully client-side roleplay chat app (HTML/CSS/JS) with:
 
-## ✨ Features
+- **Default KoboldAI/KoboldCpp support** (works out of the box).
+- **OpenAI-compatible provider routing** for **OpenAI**, **Groq**, **OpenRouter**, and custom OpenAI-style endpoints.
+- **Custom prompt template system** with placeholders for persona, memory, world rules, and user/character names.
+- **AI Tavern card import** (`.json` and `.png` metadata cards) compatible with cards exported by AImaker-style tools.
+- Built-in long-term memory, markdown rendering, sanitized output, and transcript export.
 
-*   **Modern Light UI**: A clean, minimalist dashboard design with a responsive sidebar and smooth chat bubbles.
-*   **Dynamic Character Creation**: Define your AI's personality, speaking style, and background.
-*   **Rich Text Support**: Messages support Markdown rendering (bold, italics, lists, code blocks) with syntax highlighting.
-*   **Custom Avatars**: Set custom avatar URLs for both yourself and the character.
-*   **API Configuration**: Easily switch the KoboldCpp API endpoint (default provided).
-*   **Long-Term Memory**: Simulates memory persistence for facts, relationships, and world lore.
-*   **Persistent Settings**: Your last used names, persona, and chat history are saved locally.
-*   **Secure**: Uses DOMPurify to sanitize AI outputs, preventing XSS attacks.
-*   **Responsive**: Optimized for both desktop and mobile devices with a collapsible sidebar.
+## Features
 
-## 🚀 How It Works
+- Multi-provider config in the sidebar:
+  - Provider selector
+  - API URL
+  - API key
+  - Model
+- Prompt template editor with reset button.
+- Character card import system:
+  - Load `.json` Tavern card files
+  - Load `.png` cards with `tEXt/chara` metadata
+- Persistent chat + settings via localStorage.
+- Responsive UI for desktop and mobile.
 
-This application is built entirely with client-side technologies (HTML, CSS, JavaScript).
+## Quick Start
 
-1.  **Sidebar Configuration**: Upon loading, the sidebar allows you to input:
-    *   **Identity**: Your Name and Avatar URL.
-    *   **Character**: Name, Avatar URL, and a detailed Persona/Character Sheet.
-    *   **Configuration**: The API URL (defaults to a public KoboldCpp instance).
-2.  **Chat Session**: Click "Start Session" to begin.
-3.  **Prompt Construction**: When you send a message, the app constructs a prompt including the persona, memory summary, and conversation history.
-4.  **API Call**: This prompt is sent to the KoboldCpp API.
-5.  **Response**: The AI's text is received, sanitized, formatted with Markdown, and displayed.
+1. Clone and open:
+   ```bash
+   git clone https://github.com/altkriz/AIChat.git
+   cd AIChat
+   ```
+2. Open `index.html` in your browser.
+3. Set persona and start chatting.
 
-## 🛠️ Technologies Used
+## Provider Setup
 
-*   **HTML5 & CSS3**: Semantic structure and custom modern styling (CSS variables, Flexbox).
-*   **Tailwind CSS**: Utility classes for layout and responsiveness.
-*   **JavaScript (ES6+)**: Application logic, API calls, and DOM manipulation.
-*   **Marked.js**: Markdown parsing.
-*   **DOMPurify**: HTML sanitization for security.
-*   **Highlight.js**: Syntax highlighting for code blocks.
-*   **Feather Icons**: scalable vector icons.
+### 1) KoboldAI/KoboldCpp (Default)
+- Select **KoboldAI / KoboldCpp (default)**.
+- Keep default API URL or set your local endpoint, e.g.:
+  - `http://localhost:5001/api/v1/generate`
+- API key/model are optional.
 
-## 🚦 Setup and Installation
+### 2) OpenAI
+- Provider: **OpenAI**
+- API URL: `https://api.openai.com/v1/chat/completions`
+- Set API key + model (e.g. `gpt-4o-mini`).
 
-This project requires **no backend server** for its logic.
+### 3) Groq
+- Provider: **Groq**
+- API URL: `https://api.groq.com/openai/v1/chat/completions`
+- Set Groq API key + model.
 
-1.  **Clone the Repository:**
-    ```bash
-    git clone https://github.com/altkriz/AIChat.git
-    cd AIChat
-    ```
-2.  **Open in Browser:**
-    Simply open the `index.html` file in your web browser. That's it!
+### 4) OpenRouter
+- Provider: **OpenRouter**
+- API URL: `https://openrouter.ai/api/v1/chat/completions`
+- Set OpenRouter key + model slug.
 
-    Alternatively, host it on GitHub Pages or any static file server.
+### 5) Custom OpenAI-Compatible
+- Provider: **Custom OpenAI-Compatible**
+- Use your own OpenAI-like endpoint with API key + model.
 
-## 💡 Usage
+## Prompt Template Placeholders
 
-1.  **Access the Application**: Open `index.html`.
-2.  **Configure**: Fill in the fields in the sidebar (or use defaults).
-3.  **Start Chatting**: Click "Start Session".
-4.  **Chat**: Type messages in the auto-expanding textarea.
-5.  **Memory**: Toggle the "Long-Term Memory" panel in the sidebar to see what the AI "remembers" about your conversation.
+Use these in the custom prompt template:
 
-## ⚠️ Important Considerations
+- `{{char}}`
+- `{{user}}`
+- `{{persona}}`
+- `{{scenario}}`
+- `{{world_rules}}`
+- `{{player_notes}}`
+- `{{memory}}`
+- `{{history}}`
 
-*   **API Exposure**: This is a client-side app. Do not use API endpoints that require secret keys unless you are running them locally or through a secure proxy.
-*   **Rate Limits**: The default public API endpoint might have rate limits. You can run your own local LLM using [KoboldCpp](https://github.com/LostRuins/koboldcpp) and point the app to `http://localhost:5001/api/v1/generate`.
+## AI Tavern Card Import
 
-## 🤝 Contributing
+Use **AI Tavern Card Import** in the sidebar and choose:
+- `.json` card files
+- `.png` card files containing embedded `chara` metadata
 
-Contributions are welcome!
+Imported fields (when present):
+- Name
+- Description/personality
+- Scenario/world text
+- First message
+- System prompt
+- Avatar URL (if provided as URL)
 
-1.  Fork the repository.
-2.  Create a new branch (`git checkout -b feature/your-feature-name`).
-3.  Make your changes.
-4.  Commit your changes (`git commit -m 'feat: Add new feature'`).
-5.  Push to the branch (`git push origin feature/your-feature-name`).
-6.  Open a Pull Request.
+## Notes
 
-## 📄 License
-
-This project is open-source and available under the [MIT License](LICENSE).
-
-## 📞 Contact
-
-If you have any questions or need support, please open an issue in the GitHub repository.
-
----
-Enjoy building your custom AI chat experiences!
+- This project is frontend-only; API keys are entered in-browser and stored in localStorage if auto-save is enabled.
+- For sensitive deployments, use a backend proxy and avoid exposing private endpoints/keys directly to users.
