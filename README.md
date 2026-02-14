@@ -1,92 +1,71 @@
-# KrizVibe Chat — Multi-Provider Roleplay Client
+# KrizVibe RP Studio (Multi-Provider + Tavern Gallery)
 
-KrizVibe is a fully client-side roleplay chat app (HTML/CSS/JS) with:
+KrizVibe is a polished, frontend-only roleplay chat studio with strict character prompting, provider switching, Tavern card import, and a searchable character gallery.
 
-- **Default KoboldAI/KoboldCpp support** (works out of the box).
-- **OpenAI-compatible provider routing** for **OpenAI**, **Groq**, **OpenRouter**, and custom OpenAI-style endpoints.
-- **Custom prompt template system** with placeholders for persona, memory, world rules, and user/character names.
-- **AI Tavern card import** (`.json` and `.png` metadata cards) compatible with cards exported by AImaker-style tools.
-- Built-in long-term memory, markdown rendering, sanitized output, and transcript export.
+![KrizVibe RP Studio screenshot](browser:/tmp/codex_browser_invocations/5176ec8ead293ae7/artifacts/artifacts/final-ui.png)
 
-## Features
+## Highlights
 
-- Multi-provider config in the sidebar:
-  - Provider selector
-  - API URL
-  - API key
-  - Model
-- Prompt template editor with reset button.
-- Character card import system:
-  - Load `.json` Tavern card files
-  - Load `.png` cards with `tEXt/chara` metadata
-- Persistent chat + settings via localStorage.
-- Responsive UI for desktop and mobile.
+- **Default KoboldAI/KoboldCpp** support out of the box.
+- **OpenAI-compatible routing** for OpenAI, Groq, OpenRouter, and custom endpoints.
+- **Strict prompt template mode**: your system prompt template is used directly (no hidden extra prompt layers).
+- **Persona-first character behavior**: character persona + story are injected as core identity.
+- **Direct + indirect user speech support** explicitly enforced in the template.
+- **Streaming responses** for supported OpenAI-compatible APIs.
+- **Generation controls** (temperature, max tokens, top_p, repetition penalty).
+- **Tavern card import** from local `.json` / `.png` (tEXt + iTXt parsing).
+- **Character gallery integration** using:
+  - `https://kriztech.in/krpstudio/api.php?action=get_gallery&page=1&search=`
+- **One-click gallery import** into active character profile.
+- **Security-focused API key handling**:
+  - “Save API key locally” opt-in (off by default).
+  - Clear secrets button.
+- **Regenerate + Edit Last User** utilities.
+- **Bundle export/import** (settings + chat + memory).
+- **Memory namespaced per character** to avoid cross-character contamination.
 
 ## Quick Start
 
-1. Clone and open:
+1. Clone repo:
    ```bash
    git clone https://github.com/altkriz/AIChat.git
    cd AIChat
    ```
 2. Open `index.html` in your browser.
-3. Set persona and start chatting.
+3. Pick provider, set persona/story, and click **Start Session**.
 
 ## Provider Setup
 
-### 1) KoboldAI/KoboldCpp (Default)
-- Select **KoboldAI / KoboldCpp (default)**.
-- Keep default API URL or set your local endpoint, e.g.:
-  - `http://localhost:5001/api/v1/generate`
-- API key/model are optional.
+- **KoboldAI/KoboldCpp (default)**
+  - URL example: `http://localhost:5001/api/v1/generate`
+  - API key optional.
 
-### 2) OpenAI
-- Provider: **OpenAI**
-- API URL: `https://api.openai.com/v1/chat/completions`
-- Set API key + model (e.g. `gpt-4o-mini`).
+- **OpenAI / Groq / OpenRouter / Custom OpenAI-compatible**
+  - Set API URL + API key + model.
+  - Enable streaming for incremental output.
 
-### 3) Groq
-- Provider: **Groq**
-- API URL: `https://api.groq.com/openai/v1/chat/completions`
-- Set Groq API key + model.
+## Prompt Placeholders
 
-### 4) OpenRouter
-- Provider: **OpenRouter**
-- API URL: `https://openrouter.ai/api/v1/chat/completions`
-- Set OpenRouter key + model slug.
-
-### 5) Custom OpenAI-Compatible
-- Provider: **Custom OpenAI-Compatible**
-- Use your own OpenAI-like endpoint with API key + model.
-
-## Prompt Template Placeholders
-
-Use these in the custom prompt template:
+Use inside the strict prompt template:
 
 - `{{char}}`
 - `{{user}}`
 - `{{persona}}`
-- `{{scenario}}`
+- `{{story}}`
 - `{{world_rules}}`
 - `{{player_notes}}`
 - `{{memory}}`
 - `{{history}}`
 
-## AI Tavern Card Import
+## Tavern Character Sources
 
-Use **AI Tavern Card Import** in the sidebar and choose:
-- `.json` card files
-- `.png` card files containing embedded `chara` metadata
+### Local import
+- Import `.json` or `.png` Tavern cards using **AI Tavern Card Import**.
 
-Imported fields (when present):
-- Name
-- Description/personality
-- Scenario/world text
-- First message
-- System prompt
-- Avatar URL (if provided as URL)
+### Gallery import
+- Use **Character Gallery** search and import directly from the integrated gallery API.
 
-## Notes
+## Security Note
 
-- This project is frontend-only; API keys are entered in-browser and stored in localStorage if auto-save is enabled.
-- For sensitive deployments, use a backend proxy and avoid exposing private endpoints/keys directly to users.
+This is a pure client-side app. API calls are made directly from browser.
+For production or shared environments, use a secure backend proxy.
