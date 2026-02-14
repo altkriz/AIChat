@@ -3,215 +3,179 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>KrizVibe — Modern RP Chat (Light Theme)</title>
+  <title>KrizVibe — Ultimate RP Studio</title>
 
-  <!-- Tailwind CSS (via CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Feather Icons -->
   <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-
-  <!-- Marked.js -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <!-- DOMPurify -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
-
-  <!-- Highlight.js -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <!-- Custom Styles -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="css/style.css" rel="stylesheet" />
 </head>
-
 <body>
-  <!-- Mobile Sidebar Overlay -->
   <div id="sidebar-overlay" class="sidebar-overlay fixed inset-0 hidden md:hidden"></div>
-
   <div class="flex h-screen overflow-hidden">
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar w-80 h-full flex flex-col p-6 absolute md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-300 z-50 shadow-xl md:shadow-none bg-white">
-
-      <!-- Brand -->
-      <div class="flex items-center gap-3 mb-8">
-        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
-          KV
-        </div>
+    <aside class="sidebar w-[24rem] h-full flex flex-col p-5 absolute md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-300 z-50 shadow-xl md:shadow-none bg-white">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-11 h-11 rounded-2xl brand-tile flex items-center justify-center text-white font-bold text-lg">KV</div>
         <div>
-          <h1 class="font-bold text-lg text-slate-800 leading-tight">KrizVibe Chat</h1>
-          <p class="text-xs text-slate-500 font-medium">v2.0 • Light Theme</p>
+          <h1 class="font-extrabold text-lg text-slate-800 leading-tight">KrizVibe RP Studio</h1>
+          <p class="text-xs text-slate-500 font-medium">v4.0 • Story + Character Hub</p>
         </div>
-        <!-- Close Button (Mobile) -->
-        <button class="md:hidden ml-auto text-slate-400 hover:text-slate-600" onclick="toggleSidebar()">
-          <i data-feather="x" class="w-5 h-5"></i>
-        </button>
+        <button class="md:hidden ml-auto text-slate-400 hover:text-slate-600" onclick="toggleSidebar()"><i data-feather="x" class="w-5 h-5"></i></button>
       </div>
 
-      <!-- Settings Inputs -->
-      <div class="flex-1 overflow-y-auto space-y-5 pr-2 custom-scroll">
-
-        <!-- Identity -->
-        <div class="space-y-3">
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wide">Identity</label>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <input id="user-name-input" class="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all" placeholder="Your Name">
-            </div>
-            <div>
-              <input id="character-name-input" class="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all" placeholder="Char Name">
-            </div>
+      <div class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scroll">
+        <section class="panel">
+          <label class="panel-title">Identity</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="user-name-input" class="field" placeholder="Your Name">
+            <input id="character-name-input" class="field" placeholder="Character Name">
           </div>
-
-          <div class="space-y-2">
-            <input id="user-avatar-input" class="w-full px-3 py-2 rounded-lg text-xs bg-slate-50 border border-slate-200 text-slate-600 focus:border-indigo-500 outline-none" placeholder="Your Avatar URL (opt)">
-            <input id="char-avatar-input" class="w-full px-3 py-2 rounded-lg text-xs bg-slate-50 border border-slate-200 text-slate-600 focus:border-indigo-500 outline-none" placeholder="Char Avatar URL (opt)">
+          <div class="mt-2 space-y-2">
+            <input id="user-avatar-input" class="field" placeholder="Your Avatar URL (optional)">
+            <input id="char-avatar-input" class="field" placeholder="Character Avatar URL (optional)">
           </div>
-        </div>
+        </section>
 
-        <!-- Persona -->
-        <div class="space-y-3">
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wide">Persona & Rules</label>
+        <section class="panel">
+          <label class="panel-title">Persona / Story Core</label>
+          <textarea id="character-sheet-input" rows="4" class="field resize-none">Luna is a cosmic librarian with soft humor, gentle mystery, and poetic tone.</textarea>
+          <textarea id="world-rules-input" rows="3" class="field mt-2 resize-none">Story: A drifting archive ship explores forgotten worlds. Always stay in character.</textarea>
+          <textarea id="player-notes-input" rows="2" class="field mt-2 resize-none">Allow direct and indirect player speech styles.</textarea>
+        </section>
 
-          <textarea id="character-sheet-input" rows="4" class="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all resize-none" placeholder="Character Persona...">Luna is a cosmic librarian with soft humor, gentle mystery, and poetic tone.</textarea>
-
-          <textarea id="player-notes-input" rows="2" class="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 border border-slate-200 focus:border-indigo-500 outline-none resize-none" placeholder="Player Notes...">Avoid political tension. Keep replies PG-13.</textarea>
-
-          <textarea id="world-rules-input" rows="2" class="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 border border-slate-200 focus:border-indigo-500 outline-none resize-none" placeholder="World Rules...">Always stay in character. No OOC.</textarea>
-        </div>
-
-        <!-- Configuration -->
-        <div class="space-y-3 pt-4 border-t border-slate-100">
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wide">Configuration</label>
-
-          <input id="api-url-input" class="w-full px-3 py-2 rounded-lg text-xs font-mono bg-slate-50 border border-slate-200 text-slate-600 focus:border-indigo-500 outline-none" value="https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate">
-
-          <div class="flex items-center gap-2">
-            <input id="persist-switch" type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
-            <label for="persist-switch" class="text-sm text-slate-600 cursor-pointer select-none">Auto-save chat</label>
+        <section class="panel">
+          <label class="panel-title">AI Provider</label>
+          <select id="provider-select" class="field">
+            <option value="kobold">KoboldAI / KoboldCpp (default)</option>
+            <option value="openai">OpenAI</option>
+            <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="custom_openai">Custom OpenAI-Compatible</option>
+          </select>
+          <input id="api-url-input" class="field mt-2 font-mono text-xs" />
+          <input id="api-key-input" class="field mt-2 font-mono text-xs" placeholder="API Key">
+          <input id="model-input" class="field mt-2 font-mono text-xs" placeholder="Model name">
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <button id="provider-test-btn" class="sub-btn">Test Connection</button>
+            <button id="clear-secrets-btn" class="sub-btn">Clear Secrets</button>
           </div>
-        </div>
+          <label class="inline-flex gap-2 items-center mt-2 text-xs text-slate-600">
+            <input id="persist-api-key-switch" type="checkbox" class="w-4 h-4"> Save API key locally
+          </label>
+          <p id="provider-hint" class="text-[11px] text-slate-500 mt-1"></p>
+        </section>
 
-        <!-- Memory Panel -->
-        <div class="pt-4 border-t border-slate-100">
-          <button id="toggle-memory" class="flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors w-full">
-            <i data-feather="database" class="w-4 h-4"></i>
-            <span>View Long-Term Memory</span>
-          </button>
-
-          <div id="memory-panel" class="hidden mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-3 shadow-inner">
-            <div class="space-y-1">
-              <span class="text-xs font-bold text-indigo-500 uppercase">Facts</span>
-              <div id="mem-facts" class="text-slate-600 pl-2 border-l-2 border-indigo-200"></div>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs font-bold text-pink-500 uppercase">Relationships</span>
-              <div id="mem-relationships" class="text-slate-600 pl-2 border-l-2 border-pink-200"></div>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs font-bold text-emerald-500 uppercase">Lore</span>
-              <div id="mem-world" class="text-slate-600 pl-2 border-l-2 border-emerald-200"></div>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs font-bold text-amber-500 uppercase">Events</span>
-              <div id="mem-events" class="text-slate-600 pl-2 border-l-2 border-amber-200"></div>
-            </div>
-            <div class="pt-2">
-              <button id="memory-clear" class="w-full py-1.5 px-3 rounded bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors text-xs font-medium">Reset Memory</button>
-            </div>
+        <section class="panel">
+          <div class="flex justify-between items-center">
+            <label class="panel-title">Prompt Template (strict)</label>
+            <button id="reset-prompt-btn" class="tiny-link">Reset</button>
           </div>
-        </div>
+          <textarea id="prompt-template-input" rows="7" class="field font-mono text-xs resize-y"></textarea>
+          <p class="text-[11px] text-slate-500 mt-1">Template is used exactly as the main system prompt. Placeholders: {{char}}, {{user}}, {{persona}}, {{story}}, {{world_rules}}, {{player_notes}}, {{memory}}, {{history}}.</p>
+        </section>
+
+        <section class="panel">
+          <label class="panel-title">Generation Controls</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="temperature-input" class="field" type="number" min="0" max="2" step="0.05" value="0.8" placeholder="Temperature">
+            <input id="max-tokens-input" class="field" type="number" min="64" max="2048" step="1" value="500" placeholder="Max tokens">
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <input id="top-p-input" class="field" type="number" min="0" max="1" step="0.01" value="0.92" placeholder="Top P">
+            <input id="rep-pen-input" class="field" type="number" min="0.5" max="2" step="0.01" value="1.05" placeholder="Rep Penalty">
+          </div>
+          <label class="inline-flex gap-2 items-center mt-2 text-xs text-slate-600"><input id="streaming-switch" type="checkbox" class="w-4 h-4" checked> Stream supported providers</label>
+        </section>
+
+        <section class="panel">
+          <label class="panel-title">AI Tavern Card Import</label>
+          <input id="tavern-card-input" type="file" accept=".json,.png" class="w-full text-xs">
+          <p id="tavern-card-status" class="text-[11px] text-slate-500 mt-1">Import local Tavern/AImaker card.</p>
+        </section>
+
+        <section class="panel">
+          <div class="flex items-center justify-between">
+            <label class="panel-title">Character Gallery</label>
+            <span id="gallery-meta" class="text-[11px] text-slate-500"></span>
+          </div>
+          <div class="flex gap-2">
+            <input id="gallery-search-input" class="field" placeholder="Search characters...">
+            <button id="gallery-search-btn" class="sub-btn px-3">Go</button>
+          </div>
+          <div id="gallery-list" class="gallery-list mt-2"></div>
+          <div class="flex gap-2 mt-2">
+            <button id="gallery-prev-btn" class="sub-btn">Prev</button>
+            <button id="gallery-next-btn" class="sub-btn">Next</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <label class="inline-flex gap-2 items-center text-sm text-slate-600"><input id="persist-switch" type="checkbox" checked class="w-4 h-4"> Auto-save chat/settings</label>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <button id="bundle-export-btn" class="sub-btn">Export Bundle</button>
+            <input id="bundle-import-input" type="file" accept="application/json" class="hidden">
+            <button id="bundle-import-btn" class="sub-btn">Import Bundle</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <button id="toggle-memory" class="flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800"><i data-feather="database" class="w-4 h-4"></i><span>Long-Term Memory</span></button>
+          <div id="memory-panel" class="hidden mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-2">
+            <div><strong>Emotion:</strong> <span id="mem-emotion"></span></div>
+            <div><strong>Facts</strong><div id="mem-facts"></div></div>
+            <div><strong>Relationships</strong><div id="mem-relationships"></div></div>
+            <div><strong>Lore</strong><div id="mem-world"></div></div>
+            <div><strong>Events</strong><div id="mem-events"></div></div>
+            <button id="memory-clear" class="sub-btn w-full">Reset Memory</button>
+          </div>
+        </section>
       </div>
 
-      <!-- Footer Actions -->
-      <div class="pt-4 mt-auto border-t border-slate-100 grid grid-cols-2 gap-2">
-        <button id="clear-history" class="py-2 px-3 rounded-lg border border-slate-200 text-slate-500 text-xs font-medium hover:bg-slate-50 hover:text-slate-700 transition-colors">Clear Chat</button>
-        <button id="export-btn" class="py-2 px-3 rounded-lg border border-slate-200 text-slate-500 text-xs font-medium hover:bg-slate-50 hover:text-slate-700 transition-colors">Export TXT</button>
+      <div class="pt-3 mt-auto border-t border-slate-100 grid grid-cols-2 gap-2">
+        <button id="clear-history" class="sub-btn">Clear Chat</button>
+        <button id="export-btn" class="sub-btn">Export TXT</button>
       </div>
     </aside>
 
-    <!-- MAIN CHAT AREA -->
     <main class="flex-1 flex flex-col h-full bg-slate-50/50 relative">
-
-      <!-- Top Bar -->
-      <header class="h-16 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 justify-between shrink-0 z-10 shadow-sm">
-
+      <header class="h-16 header-gradient border-b border-slate-200 flex items-center px-4 md:px-6 justify-between shrink-0 z-10">
         <div class="flex items-center gap-3">
-          <button id="menu-toggle" class="md:hidden p-2 -ml-2 text-slate-400 hover:text-indigo-600 transition-colors">
-            <i data-feather="menu" class="w-6 h-6"></i>
-          </button>
-
+          <button id="menu-toggle" class="md:hidden p-2 -ml-2 text-slate-400 hover:text-indigo-600"><i data-feather="menu" class="w-6 h-6"></i></button>
           <div class="flex items-center gap-3">
-            <div id="char-avatar" class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-200 bg-cover bg-center avatar-ring">
-              C
-            </div>
+            <div id="char-avatar" class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-200 bg-cover bg-center avatar-ring">C</div>
             <div>
-              <h2 id="character-name-display" class="font-bold text-slate-800 text-sm md:text-base leading-tight">Character</h2>
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <span class="text-xs text-slate-400 font-medium">Online</span>
-              </div>
+              <h2 id="character-name-display" class="font-bold text-slate-800 text-sm md:text-base">Character</h2>
+              <p id="character-bio-mini" class="text-xs text-slate-500 max-w-[440px] truncate">Persona preview</p>
             </div>
           </div>
         </div>
-
-        <button id="start-chat-button" class="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all active:scale-95">
-          <i data-feather="play-circle" class="w-4 h-4"></i>
-          <span>Start Session</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <button id="regenerate-btn" class="sub-btn hidden md:inline-flex">Regenerate</button>
+          <button id="edit-last-user-btn" class="sub-btn hidden md:inline-flex">Edit Last User</button>
+          <button id="start-chat-button" class="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-md"><i data-feather="play-circle" class="w-4 h-4"></i><span>Start Session</span></button>
+        </div>
       </header>
 
-      <!-- Chat History -->
-      <div id="chatbox" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth bg-slate-50">
-        <!-- Placeholder -->
-        <div class="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-40">
-          <div class="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center text-slate-400">
-            <i data-feather="message-square" class="w-8 h-8"></i>
-          </div>
-          <div class="max-w-xs">
-            <p class="text-slate-500 font-medium">Ready to chat?</p>
-            <p class="text-slate-400 text-sm mt-1">Configure your character in the sidebar and press Start.</p>
-          </div>
+      <div id="chatbox" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth bg-slate-50"></div>
+
+      <div class="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 z-20">
+        <div class="md:hidden grid grid-cols-2 gap-2 mb-2">
+          <button id="mobile-start-btn" class="sub-btn">Start</button>
+          <button id="mobile-regenerate-btn" class="sub-btn">Regenerate</button>
         </div>
-      </div>
-
-      <!-- Bottom Input Area -->
-      <div class="p-4 md:p-6 bg-white border-t border-slate-200 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-20">
-
-        <!-- Mobile Start Button (Visible only on small screens) -->
-        <button id="mobile-start-btn" class="md:hidden w-full mb-3 py-2 bg-indigo-50 text-indigo-600 font-semibold text-sm rounded-lg border border-indigo-100 flex items-center justify-center gap-2">
-          <i data-feather="play-circle" class="w-4 h-4"></i> Start / Restart
-        </button>
-
         <div id="typing-indicator" class="hidden flex items-center gap-2 mb-2 px-2">
           <span class="text-xs font-semibold text-indigo-500 uppercase tracking-wide" id="typing-text">Thinking</span>
-          <div class="typing-dots flex gap-1">
-            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
-            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
-            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
-          </div>
+          <div class="typing-dots flex gap-1"><span></span><span></span><span></span></div>
         </div>
-
-        <div class="relative flex items-end gap-3 max-w-4xl mx-auto w-full">
-          <div class="relative flex-1">
-            <textarea id="user_input" class="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm text-slate-700 placeholder:text-slate-400 min-h-[52px] max-h-40 resize-none text-base" placeholder="Type a message..." rows="1"></textarea>
-          </div>
-
-          <button id="send_button" class="h-[52px] w-[52px] flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95 shrink-0">
-            <i data-feather="send" class="w-5 h-5 translate-x-0.5 -translate-y-0.5"></i>
-          </button>
-        </div>
-
-        <div class="text-center mt-2">
-          <p class="text-[10px] text-slate-300">AI output may be inaccurate. Verify important information.</p>
+        <div class="relative flex items-end gap-3 max-w-5xl mx-auto w-full">
+          <textarea id="user_input" class="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none min-h-[52px] max-h-40 resize-none text-base" placeholder="Talk directly or indirectly to the character..." rows="1"></textarea>
+          <button id="send_button" class="h-[52px] w-[52px] flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-lg transition-all active:scale-95 shrink-0"><i data-feather="send" class="w-5 h-5"></i></button>
         </div>
       </div>
-
     </main>
   </div>
 
