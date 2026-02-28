@@ -14,7 +14,7 @@ if (typeof marked !== 'undefined') {
 
 const STATE_KEY = 'krizrp_state_v4';
 const DEFAULT_PROVIDER = 'kobold';
-const GALLERY_BASE_URL = 'https://kriztech.in/krpstudio/api.php?action=get_gallery';
+const GALLERY_BASE_URL = 'https://kriztech.in/krizrp/api.php?action=get_gallery';
 
 const PROVIDER_DEFAULTS = {
   kobold: { apiUrl: 'https://koboldai-koboldcpp-tiefighter.hf.space/api/v1/generate', model: '', needsKey: false },
