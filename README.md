@@ -2,8 +2,6 @@
 
 KrizVibe is a polished, frontend-only roleplay chat studio with strict character prompting, provider switching, Tavern card import, and a searchable character gallery.
 
-![KrizVibe RP Studio screenshot](browser:/tmp/codex_browser_invocations/5176ec8ead293ae7/artifacts/artifacts/final-ui.png)
-
 ## Highlights
 
 - **Default KoboldAI/KoboldCpp** support out of the box.
@@ -14,8 +12,6 @@ KrizVibe is a polished, frontend-only roleplay chat studio with strict character
 - **Streaming responses** for supported OpenAI-compatible APIs.
 - **Generation controls** (temperature, max tokens, top_p, repetition penalty).
 - **Tavern card import** from local `.json` / `.png` (tEXt + iTXt parsing).
-- **Character gallery integration** using:
-  - `https://kriztech.in/krpstudio/api.php?action=get_gallery&page=1&search=`
 - **One-click gallery import** into active character profile.
 - **Security-focused API key handling**:
   - “Save API key locally” opt-in (off by default).
